@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+model User {
+  user_id      String  @id @default(uuid()) @db.Uuid // ✅ UUID 타입 설정
+  email        String  @unique
+  name         String
+  phone        String?
+  profileImage String?
+  address      String?
+  role         String
+  createdAt    DateTime @default(now())
+
+  pets         Pet[]   // 반려동물 관계 설정 (1:N)
+}
+
+model Pet {
+  pet_id     String  @id @default(uuid())  // 고유 ID
+  user_id    String  @db.Uuid              // 유저 ID (외래키, UUID 타입)
+  name       String
+  species    String
+  breed      String?
+  age        Int?
+  weight     Float?
+  photo      String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // 외래키 관계 설정: User의 user_id를 참조하도록 변경
+  user       User    @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+}

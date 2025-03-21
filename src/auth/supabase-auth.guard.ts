@@ -6,10 +6,14 @@ import {
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { Request } from 'express';
+import { PrismaService } from 'prisma/prisma.service';
 
 @Injectable()
 export class SupabaseAuthGuard implements CanActivate {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
@@ -23,13 +27,34 @@ export class SupabaseAuthGuard implements CanActivate {
     if (!token) {
       throw new UnauthorizedException('Invalid token format');
     }
-
-    const user = await this.supabaseService.getUserByToken(token);
-    if (!user) {
+    // 1. Supabase에서 토큰으로 유저 정보 가져오기
+    const supabaseUser = await this.supabaseService.getUserByToken(token);
+    if (!supabaseUser) {
       throw new UnauthorizedException('Invalid or expired token');
     }
 
-    request.user = user; // 요청 객체에 유저 정보 저장
+    // 2. PostgreSQL에서 유저 정보 (role 포함) 조회
+    const userFromDB = await this.prisma.user.findUnique({
+      where: { user_id: supabaseUser.id },
+      select: {
+        user_id: true,
+        email: true,
+        role: true,
+        name: true,
+        phone: true,
+      },
+    });
+
+    if (!userFromDB) {
+      throw new UnauthorizedException('User not found in database');
+    }
+
+    // 3. request.user에 Supabase + DB 정보 합쳐서 저장
+    request.user = {
+      ...userFromDB,
+      ...supabaseUser,
+      phone: supabaseUser.phone ?? undefined,
+    };
     return true;
   }
 }

@@ -10,45 +10,48 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { PetsService } from './pets.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { SupabaseAuthGuard } from '../auth/supabase-auth.guard'; // ← 이름 바꿔줌
+import { CreatePetDto } from './dto/create-pet.dto';
+import { UpdatePetDto } from './dto/update-pet.dto';
 
 @Controller('pets')
 export class PetsController {
   constructor(private readonly petsService: PetsService) {}
 
-  // 반려동물 등록
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(SupabaseAuthGuard)
   @Post()
-  async createPet(@Request() req, @Body() petData) {
-    const userId = req.user.user_id; // JWT 토큰에서 유저 ID 추출
+  async createPet(@Request() req, @Body() petData: CreatePetDto) {
+    const userId = req.user.user_id;
     return this.petsService.createPet(userId, petData);
   }
 
-  // 특정 유저의 반려동물 목록 조회
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(SupabaseAuthGuard)
   @Get()
   async getUserPets(@Request() req) {
     const userId = req.user.user_id;
     return this.petsService.getUserPets(userId);
   }
 
-  // 특정 반려동물 조회
   @Get(':id')
   async getPetById(@Param('id') petId: string) {
     return this.petsService.getPetById(petId);
   }
 
-  // 반려동물 정보 수정
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(SupabaseAuthGuard)
   @Patch(':id')
-  async updatePet(@Param('id') petId: string, @Body() petData) {
-    return this.petsService.updatePet(petId, petData);
+  async updatePet(
+    @Request() req,
+    @Param('id') petId: string,
+    @Body() petData: UpdatePetDto,
+  ) {
+    const userId = req.user.user_id;
+    return this.petsService.updatePet(petId, petData, userId);
   }
 
-  // 반려동물 삭제
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(SupabaseAuthGuard)
   @Delete(':id')
-  async deletePet(@Param('id') petId: string) {
-    return this.petsService.deletePet(petId);
+  async deletePet(@Request() req, @Param('id') petId: string) {
+    const userId = req.user.user_id;
+    return this.petsService.deletePet(petId, userId);
   }
 }

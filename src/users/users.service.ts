@@ -9,28 +9,16 @@ export class UsersService {
     private supabaseService: SupabaseService,
   ) {}
 
-  async signUp(userData: {
-    email: string;
-    password: string;
-    name: string;
-    phone?: string;
-    profileImage?: string;
-    address?: string;
-    role: string;
-  }) {
-    // Supabase에서 회원가입 처리
+  async signUp(userData: any) {
     const supabaseUser = await this.supabaseService.signUpWithEmailPassword({
       ...userData,
-      phone: userData.phone || '',
-      address: userData.address || '',
     });
 
     if (!supabaseUser) {
       throw new Error('Supabase user creation failed');
     }
 
-    // PostgreSQL(user 테이블)에 저장
-    const user = await this.prisma.user.create({
+    return this.prisma.user.create({
       data: {
         user_id: supabaseUser.id,
         email: userData.email,
@@ -41,7 +29,24 @@ export class UsersService {
         role: userData.role,
       },
     });
+  }
 
-    return user;
+  async getUserById(userId: string) {
+    return this.prisma.user.findUnique({
+      where: { user_id: userId },
+    });
+  }
+
+  async updateUser(userId: string, data: any) {
+    return this.prisma.user.update({
+      where: { user_id: userId },
+      data,
+    });
+  }
+
+  async deleteUser(userId: string) {
+    return this.prisma.user.delete({
+      where: { user_id: userId },
+    });
   }
 }

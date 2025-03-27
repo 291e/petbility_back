@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { PetsService } from './pets.service';
-import { SupabaseAuthGuard } from '../auth/supabase-auth.guard'; // ← 이름 바꿔줌
+import { SupabaseAuthGuard } from '@/auth/supabase-auth.guard'; // ← 이름 바꿔줌
 import { CreatePetDto } from './dto/create-pet.dto';
 import { UpdatePetDto } from './dto/update-pet.dto';
 

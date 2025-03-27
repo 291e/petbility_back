@@ -40,6 +40,7 @@ model User {
   services              Service[]              @relation("UserServices")        // 사업자가 등록한 서비스들
   reservations          Reservation[]          @relation("UserReservations")    // 예약한 유저로서의 예약
   businessReservations  Reservation[]          @relation("BusinessReservations")// 사업자로서 받은 예약
+  notifications         Notification[]         @relation("UserNotifications")   // 유저의 알림들
 }
 
 model Pet {
@@ -70,6 +71,7 @@ model Service {
   location          String
   latitude          Float
   longitude         Float
+    is_deleted Boolean  @default(false)
   category          ServiceCategory
   avg_rating        Float     @default(0)
   review_count      Int       @default(0)
@@ -97,6 +99,8 @@ model Reservation {
   time             String
   status           ReservationStatus
   notes            String?
+  price Decimal @default(0)
+
 
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt
@@ -108,4 +112,16 @@ model Reservation {
   pet        Pet      @relation(fields: [pet_id], references: [pet_id])
 
   @@map("reservations")
+}
+
+model Notification {
+  notification_id String   @id @default(uuid()) @db.Uuid
+  user_id         String   @db.Uuid
+  message         String
+  type            String   // 'reservation', 'system', 'etc'
+  is_read         Boolean  @default(false)
+  created_at      DateTime @default(now())
+  user            User     @relation("UserNotifications", fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@map("notifications") // 실제 테이블명
 }

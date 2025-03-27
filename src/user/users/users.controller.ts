@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
+import { SupabaseAuthGuard } from '@/auth/supabase-auth.guard';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -32,12 +32,20 @@ export class UsersController {
   @UseGuards(SupabaseAuthGuard)
   @Patch('me')
   async updateMe(@Request() req, @Body() updateData: UpdateUserDto) {
-    return this.usersService.updateUser(req.user.user_id, updateData);
+    const userId = req.user.user_id;
+    return this.usersService.updateUser(userId, updateData);
   }
 
   @UseGuards(SupabaseAuthGuard)
   @Delete('me')
   async deleteMe(@Request() req) {
     return this.usersService.deleteUser(req.user.user_id);
+  }
+
+  @UseGuards(SupabaseAuthGuard)
+  @Patch('upgrade')
+  async upgradeToBusiness(@Request() req) {
+    const userId = req.user.user_id;
+    return this.usersService.upgradeToBusiness(userId);
   }
 }

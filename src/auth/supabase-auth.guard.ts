@@ -4,7 +4,7 @@ import {
   ExecutionContext,
   UnauthorizedException,
 } from '@nestjs/common';
-import { SupabaseService } from '../supabase/supabase.service';
+import { SupabaseService } from '@/auth/supabase/supabase.service';
 import { Request } from 'express';
 import { PrismaService } from 'prisma/prisma.service';
 
@@ -51,8 +51,8 @@ export class SupabaseAuthGuard implements CanActivate {
 
     // 3. request.user에 Supabase + DB 정보 합쳐서 저장
     request.user = {
-      ...userFromDB,
       ...supabaseUser,
+      ...userFromDB,
       phone: supabaseUser.phone ?? undefined,
     };
     return true;

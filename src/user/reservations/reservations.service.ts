@@ -10,12 +10,14 @@ import { CreateReservationDto } from './dto/create-reservation.dto';
 import { Prisma, ReservationStatus } from '@prisma/client';
 import { format, parseISO } from 'date-fns';
 import { NotificationsService } from '@/notifications/notifications.service';
+import { NotificationsGateway } from '@/notifications/notifications.gateway';
 
 @Injectable()
 export class ReservationsService {
   constructor(
     private readonly prisma: PrismaService,
-    private notificationsService: NotificationsService,
+    private readonly notificationsService: NotificationsService,
+    private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
   // 예약 생성
@@ -58,11 +60,19 @@ export class ReservationsService {
     });
 
     // 4. 알림 생성 (사업자에게)
+    const message = `📌 [${service.name}] 서비스에 새로운 예약 요청이 있습니다.`;
+
     await this.notificationsService.create({
       user_id: service.business_id,
-      message: `📌 [${service.name}] 서비스에 새로운 예약 요청이 있습니다.`,
+      message,
       type: 'reservation',
     });
+
+    // 5. 실시간 웹소켓 알림 전송
+    this.notificationsGateway.sendNotificationToUser(
+      service.business_id,
+      message,
+    );
 
     return reservation;
   }

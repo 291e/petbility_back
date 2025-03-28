@@ -7,12 +7,14 @@ import {
 import { PrismaService } from 'prisma/prisma.service';
 import { ReservationStatus } from '@prisma/client';
 import { NotificationsService } from '@/notifications/notifications.service';
+import { NotificationsGateway } from '@/notifications/notifications.gateway';
 
 @Injectable()
 export class BusinessReservationsService {
   constructor(
-    private prisma: PrismaService,
-    private notificationsService: NotificationsService,
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+    private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
   async findReservationsByBusiness(
@@ -93,11 +95,19 @@ export class BusinessReservationsService {
     });
 
     // ✅ 사용자에게 알림 발송
+    const message = `예약하신 '${reservation.service.name}'의 상태가 '${status}'로 변경되었습니다.`;
+
     await this.notificationsService.create({
       user_id: reservation.user_id,
-      message: `예약하신 '${reservation.service.name}'의 상태가 '${status}'로 변경되었습니다.`,
+      message,
       type: 'reservation',
     });
+
+    // 5. 실시간 웹소켓 알림 전송
+    this.notificationsGateway.sendNotificationToUser(
+      reservation.business_id,
+      message,
+    );
 
     return updated;
   }

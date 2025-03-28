@@ -15,17 +15,9 @@ export class UsersService {
   ) {}
 
   async signUp(userData: any) {
-    const supabaseUser = await this.supabaseService.signUpWithEmailPassword({
-      ...userData,
-    });
-
-    if (!supabaseUser) {
-      throw new Error('Supabase user creation failed');
-    }
-
     return this.prisma.user.create({
       data: {
-        user_id: supabaseUser.id,
+        user_id: userData.id,
         email: userData.email,
         name: userData.name,
         phone: userData.phone || '',

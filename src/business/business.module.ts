@@ -7,9 +7,10 @@ import { BusinessReservationsService } from './reservations/business-reservation
 import { BusinessStatisticsController } from './statistics/business-statistics.controller';
 import { BusinessStatisticsService } from './statistics/business-statistics.service';
 import { SupabaseModule } from '@/auth/supabase/supabase.module';
+import { NotificationsModule } from '@/notifications/notifications.module';
 
 @Module({
-  imports: [PrismaModule, SupabaseModule],
+  imports: [PrismaModule, SupabaseModule, NotificationsModule],
   controllers: [
     BusinessServicesController,
     BusinessReservationsController,

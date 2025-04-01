@@ -32,6 +32,8 @@ model User {
   phone        String?
   profileImage String?
   address      String?
+  latitude     Float?   // 👈 추가: 위도
+  longitude    Float?
   role         String
   createdAt    DateTime @default(now())
 
@@ -41,6 +43,7 @@ model User {
   reservations          Reservation[]          @relation("UserReservations")    // 예약한 유저로서의 예약
   businessReservations  Reservation[]          @relation("BusinessReservations")// 사업자로서 받은 예약
   notifications         Notification[]         @relation("UserNotifications")   // 유저의 알림들
+   businessAvailableTime  BusinessAvailableTime[] @relation("BusinessAvailableTime")
 }
 
 model Pet {
@@ -61,58 +64,57 @@ model Pet {
 }
 
 model Service {
-  service_id        String   @id @default(uuid()) @db.Uuid
-  business_id       String   @db.Uuid
-  name              String
-  description       String
-  price             Decimal
-  duration          Int
-  available_time    Json?
-  location          String
-  latitude          Float
-  longitude         Float
-    is_deleted Boolean  @default(false)
-  category          ServiceCategory
-  avg_rating        Float     @default(0)
-  review_count      Int       @default(0)
-  likes             Int       @default(0)
-  pending_count     Int       @default(0)
-  confirmed_count   Int       @default(0)
-  canceled_count    Int       @default(0)
-  created_at        DateTime  @default(now())
-  updated_at        DateTime  @updatedAt
+  service_id   String   @id @default(uuid()) @db.Uuid
+  admin_id     String   @db.Uuid
+  name         String
+  description  String
+  price        Decimal
+  category     ServiceCategory
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
 
   // Relations
-  business      User          @relation("UserServices", fields: [business_id], references: [user_id])
-  reservations  Reservation[]
+  admin     User          @relation("UserServices", fields: [admin_id], references: [user_id])
+  reservations Reservation[]
 
-  @@map("services") // 실제 테이블명 지정
+  @@map("services")
+}
+
+model BusinessAvailableTime {
+  id           String   @id @default(uuid())
+  business_id      String   @db.Uuid       // 사업자 ID
+  day_of_week  String                 // 'mon', 'tue', ...
+  start_time   String                 // '09:00'
+  end_time     String                 // '18:00'
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  business     User     @relation("BusinessAvailableTime", fields: [business_id], references: [user_id])
 }
 
 model Reservation {
   reservation_id   String   @id @default(uuid()) @db.Uuid 
-  user_id          String   @db.Uuid
-  service_id       String   @db.Uuid
-  business_id      String   @db.Uuid
-  pet_id           String   @db.Uuid
-  date             DateTime
-  time             String
-  status           ReservationStatus
-  notes            String?
-  price Decimal @default(0)
+  user_id          String   @db.Uuid              // 예약자
+  service_id       String   @db.Uuid              // 어떤 서비스
+  business_id      String   @db.Uuid              // 매칭된 사업자
+  pet_id           String   @db.Uuid              // 반려동물
+  reserved_at      DateTime                       // 예약 일시 (예: 2025-04-01T10:00:00Z)
+  status           ReservationStatus              // 예약 상태
+  notes            String?                        // 요청사항
+  price            Decimal     @default(0)
 
-
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
+  created_at       DateTime    @default(now())
+  updated_at       DateTime    @updatedAt
 
   // Relations
-  user       User     @relation("UserReservations", fields: [user_id], references: [user_id])
-  business   User     @relation("BusinessReservations", fields: [business_id], references: [user_id])
-  service    Service  @relation(fields: [service_id], references: [service_id])
-  pet        Pet      @relation(fields: [pet_id], references: [pet_id])
+  user       User     @relation("UserReservations", fields: [user_id], references: [user_id], onDelete: Cascade)
+  business   User     @relation("BusinessReservations", fields: [business_id], references: [user_id], onDelete: Cascade)
+  service    Service  @relation(fields: [service_id], references: [service_id], onDelete: Cascade)
+  pet        Pet      @relation(fields: [pet_id], references: [pet_id], onDelete: Cascade)
 
   @@map("reservations")
 }
+
 
 model Notification {
   notification_id String   @id @default(uuid()) @db.Uuid

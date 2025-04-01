@@ -1,114 +1,64 @@
+// src/business/reservations/business-reservations.service.ts
+
 import {
-  BadRequestException,
-  ForbiddenException,
   Injectable,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
-import { ReservationStatus } from '@prisma/client';
-import { NotificationsService } from '@/notifications/notifications.service';
-import { NotificationsGateway } from '@/notifications/notifications.gateway';
+import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto';
 
 @Injectable()
 export class BusinessReservationsService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly notificationsService: NotificationsService,
-    private readonly notificationsGateway: NotificationsGateway,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async findReservationsByBusiness(
-    businessId: string,
-    options: {
-      status?: ReservationStatus;
-      from?: string;
-      to?: string;
-      page: number;
-      limit: number;
-    },
-  ) {
-    const { status, from, to, page, limit } = options;
-
-    const where: any = {
-      business_id: businessId,
-    };
-
-    if (status) where.status = status;
-    if (from || to) {
-      where.date = {};
-      if (from) where.date.gte = new Date(from);
-      if (to) where.date.lte = new Date(to);
-    }
-
-    const skip = (page - 1) * limit;
-
-    const reservations = await this.prisma.reservation.findMany({
-      where,
-      orderBy: [{ date: 'asc' }, { time: 'asc' }],
-      skip,
-      take: limit,
+  async findAll(businessId: string) {
+    return this.prisma.reservation.findMany({
+      where: { business_id: businessId },
       include: {
-        service: true,
-        pet: true,
         user: true,
+        pet: true,
+        service: true,
+      },
+      orderBy: {
+        reserved_at: 'asc',
+      },
+    });
+  }
+
+  async findOne(id: string, businessId: string) {
+    const reservation = await this.prisma.reservation.findUnique({
+      where: { reservation_id: id },
+      include: {
+        user: true,
+        pet: true,
+        service: true,
       },
     });
 
-    if (reservations.length === 0) {
-      throw new NotFoundException('예약이 존재하지 않습니다.');
-    }
+    if (!reservation) throw new NotFoundException('예약을 찾을 수 없습니다.');
+    if (reservation.business_id !== businessId)
+      throw new ForbiddenException('본인에게 할당된 예약이 아닙니다.');
 
-    return reservations;
+    return reservation;
   }
 
   async updateStatus(
-    reservationId: string,
+    id: string,
     businessId: string,
-    status: ReservationStatus,
+    dto: UpdateReservationStatusDto,
   ) {
     const reservation = await this.prisma.reservation.findUnique({
-      where: { reservation_id: reservationId },
-      include: { service: true },
+      where: { reservation_id: id },
     });
 
-    if (!reservation) {
-      throw new NotFoundException('예약을 찾을 수 없습니다.');
-    }
+    if (!reservation) throw new NotFoundException('예약을 찾을 수 없습니다.');
+    if (reservation.business_id !== businessId)
+      throw new ForbiddenException('예약 변경 권한이 없습니다.');
 
-    if (reservation.business_id !== businessId) {
-      throw new ForbiddenException('본인의 예약만 상태를 변경할 수 있습니다.');
-    }
-
-    // 예약이 이미 완료되었거나 취소된 경우 제한
-    if (['COMPLETED', 'CANCELED'].includes(reservation.status)) {
-      throw new BadRequestException(
-        '완료되거나 취소된 예약은 수정할 수 없습니다.',
-      );
-    }
-
-    const updated = await this.prisma.reservation.update({
-      where: { reservation_id: reservationId },
-      data: {
-        status,
-        updated_at: new Date(),
-      },
+    return this.prisma.reservation.update({
+      where: { reservation_id: id },
+      data: { status: dto.status },
     });
-
-    // ✅ 사용자에게 알림 발송
-    const message = `예약하신 '${reservation.service.name}'의 상태가 '${status}'로 변경되었습니다.`;
-
-    await this.notificationsService.create({
-      user_id: reservation.user_id,
-      message,
-      type: 'reservation',
-    });
-
-    // 5. 실시간 웹소켓 알림 전송
-    this.notificationsGateway.sendNotificationToUser(
-      reservation.business_id,
-      message,
-    );
-
-    return updated;
   }
 }

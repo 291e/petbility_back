@@ -1,7 +1,5 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from 'prisma/prisma.module';
-import { BusinessServicesController } from './services/business-services.controller';
-import { BusinessServicesService } from './services/business-services.service';
 import { BusinessReservationsController } from './reservations/business-reservations.controller';
 import { BusinessReservationsService } from './reservations/business-reservations.service';
 import { BusinessStatisticsController } from './statistics/business-statistics.controller';
@@ -11,15 +9,7 @@ import { NotificationsModule } from '@/notifications/notifications.module';
 
 @Module({
   imports: [PrismaModule, SupabaseModule, NotificationsModule],
-  controllers: [
-    BusinessServicesController,
-    BusinessReservationsController,
-    BusinessStatisticsController,
-  ],
-  providers: [
-    BusinessServicesService,
-    BusinessReservationsService,
-    BusinessStatisticsService,
-  ],
+  controllers: [BusinessReservationsController, BusinessStatisticsController],
+  providers: [BusinessReservationsService, BusinessStatisticsService],
 })
 export class BusinessModule {}

@@ -41,11 +41,6 @@ export class AdminUsersService {
             service: true,
             pet: true,
           },
-          orderBy: { date: 'desc' },
-        },
-        services: {
-          where: { is_deleted: false },
-          orderBy: { created_at: 'desc' },
         },
       },
     });
@@ -66,15 +61,6 @@ export class AdminUsersService {
     });
 
     if (!user) throw new NotFoundException('해당 유저가 존재하지 않습니다.');
-
-    const hasActiveServices = user.services.some((s) => !s.is_deleted);
-    const hasReservations = user.reservations.length > 0;
-
-    if (hasActiveServices || hasReservations) {
-      throw new ForbiddenException(
-        '서비스 또는 예약 이력이 있어 삭제할 수 없습니다.',
-      );
-    }
 
     // 👉 하드 삭제 (원하면 soft delete로 수정 가능)
     return this.prisma.user.delete({ where: { user_id: userId } });

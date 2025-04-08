@@ -1,53 +1,93 @@
 import {
   Controller,
   Get,
+  Post,
   Delete,
-  Patch,
   Param,
-  Query,
-  Request,
   UseGuards,
+  Req,
+  Body,
 } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { SupabaseAuthGuard } from '@/auth/supabase-auth.guard';
+import { Request } from 'express';
+import { ApiTags, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
 
+@ApiTags('Notifications')
 @Controller('notifications')
 @UseGuards(SupabaseAuthGuard)
 export class NotificationsController {
-  constructor(private readonly service: NotificationsService) {}
+  constructor(private readonly notificationsService: NotificationsService) {}
 
-  // 알림 목록 조회
-  @Get()
-  getNotifications(@Request() req, @Query('unread') unreadOnly?: string) {
-    const userId = req.user.user_id;
-    return this.service.getMyNotifications(userId, unreadOnly === 'true');
+  @ApiOperation({
+    summary: '읽지 않은 알림 조회',
+    description: '사용자의 읽지 않은 알림을 조회합니다.',
+  })
+  @ApiResponse({ status: 200, description: '읽지 않은 알림 목록 조회 성공' })
+  @Get('unread')
+  findUnread(@Req() req: Request) {
+    return this.notificationsService.findUnread(req.user.user_id);
   }
 
-  // 개별 알림 읽음 처리
-  @Patch(':id/read')
-  markAsRead(@Param('id') id: string, @Request() req) {
-    const userId = req.user.user_id;
-    return this.service.markAsRead(id, userId);
+  @ApiOperation({
+    summary: '읽은 알림 조회',
+    description: '사용자의 읽은 알림을 조회합니다.',
+  })
+  @ApiResponse({ status: 200, description: '읽은 알림 목록 조회 성공' })
+  @Get('read')
+  findRead(@Req() req: Request) {
+    return this.notificationsService.findRead(req.user.user_id);
   }
 
-  // ✅ 안 읽은 알림 수 조회
-  @Get('unread-count')
-  getUnreadCount(@Request() req) {
-    const userId = req.user.user_id;
-    return this.service.getUnreadCount(userId);
+  @ApiOperation({
+    summary: '읽지 않은 알림 개수 조회',
+    description: '사용자의 읽지 않은 알림 개수를 조회합니다.',
+  })
+  @ApiResponse({ status: 200, description: '읽지 않은 알림 개수 조회 성공' })
+  @Get('count')
+  getUnreadCount(@Req() req: Request) {
+    return this.notificationsService.getUnreadCount(req.user.user_id);
   }
 
-  // 전체 알림 읽음
-  @Patch('read-all')
-  markAllAsRead(@Request() req) {
-    const userId = req.user.user_id;
-    return this.service.markAllAsRead(userId);
+  @ApiOperation({
+    summary: '알림 읽음 처리',
+    description: '특정 알림을 읽음 처리합니다.',
+  })
+  @ApiParam({ name: 'id', description: '알림 ID' })
+  @ApiResponse({ status: 200, description: '알림 읽음 처리 성공' })
+  @Post(':id/read')
+  markAsRead(@Param('id') id: string, @Req() req: Request) {
+    return this.notificationsService.markAsRead(id, req.user.user_id);
   }
 
-  // 알림 삭제
+  @ApiOperation({
+    summary: '모든 알림 읽음 처리',
+    description: '사용자의 모든 알림을 읽음 처리합니다.',
+  })
+  @ApiResponse({ status: 200, description: '모든 알림 읽음 처리 성공' })
+  @Post('read-all')
+  markAllAsRead(@Req() req: Request) {
+    return this.notificationsService.markAllAsRead(req.user.user_id);
+  }
+
+  @ApiOperation({
+    summary: '알림 삭제',
+    description: '특정 알림을 삭제합니다.',
+  })
+  @ApiParam({ name: 'id', description: '알림 ID' })
+  @ApiResponse({ status: 200, description: '알림 삭제 성공' })
   @Delete(':id')
-  deleteNotification(@Param('id') id: string, @Request() req) {
-    const userId = req.user.user_id;
-    return this.service.deleteNotification(id, userId);
+  delete(@Param('id') id: string, @Req() req: Request) {
+    return this.notificationsService.delete(id, req.user.user_id);
+  }
+
+  @ApiOperation({
+    summary: '모든 알림 삭제',
+    description: '사용자의 모든 알림을 삭제합니다.',
+  })
+  @ApiResponse({ status: 200, description: '모든 알림 삭제 성공' })
+  @Delete()
+  deleteAll(@Req() req: Request) {
+    return this.notificationsService.deleteAll(req.user.user_id);
   }
 }

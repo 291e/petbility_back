@@ -7,6 +7,7 @@ import {
 import { SupabaseService } from '@/auth/supabase/supabase.service';
 import { Request } from 'express';
 import { PrismaService } from 'prisma/prisma.service';
+import { User } from '@supabase/supabase-js';
 
 @Injectable()
 export class SupabaseAuthGuard implements CanActivate {
@@ -42,6 +43,8 @@ export class SupabaseAuthGuard implements CanActivate {
         role: true,
         name: true,
         phone: true,
+        latitude: true,
+        longitude: true,
       },
     });
 
@@ -53,7 +56,7 @@ export class SupabaseAuthGuard implements CanActivate {
     request.user = {
       ...supabaseUser,
       ...userFromDB,
-      phone: supabaseUser.phone ?? undefined,
+      phone: supabaseUser.phone || userFromDB.phone || undefined,
     };
     return true;
   }

@@ -7,6 +7,112 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  user_id               String                  @id @default(uuid()) @db.Uuid
+  email                 String                  @unique
+  name                  String
+  phone                 String?
+  profileImage          String?
+  address               String?
+  role                  String
+  createdAt             DateTime                @default(now())
+  latitude              Float?
+  longitude             Float?
+  businessAvailableTime BusinessAvailableTime[] @relation("BusinessAvailableTime")
+  pets                  Pet[]
+  notifications         Notification[]          @relation("UserNotifications")
+  businessReservations  Reservation[]           @relation("BusinessReservations")
+  reservations          Reservation[]           @relation("UserReservations")
+  services              Service[]               @relation("UserServices")
+}
+
+model Pet {
+  pet_id       String        @id @default(uuid()) @db.Uuid
+  user_id      String        @db.Uuid
+  name         String
+  species      String
+  breed        String?
+  age          Int?
+  weight       Float?
+  photo        String?
+  created_at   DateTime      @default(now())
+  updated_at   DateTime      @updatedAt
+  user         User          @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  reservations Reservation[]
+}
+
+model Service {
+  service_id            String                  @id @default(uuid()) @db.Uuid
+  name                  String
+  description           String
+  price                 Decimal
+  category              ServiceCategory
+  created_at            DateTime                @default(now())
+  updated_at            DateTime                @updatedAt
+  admin_id              String                  @db.Uuid
+  businessAvailableTime BusinessAvailableTime[]
+  reservations          Reservation[]
+  admin                 User                    @relation("UserServices", fields: [admin_id], references: [user_id])
+
+  @@map("services")
+}
+
+model BusinessAvailableTime {
+  id          String       @id @default(uuid())
+  business_id String       @db.Uuid
+  day_of_week String?
+  start_time  String
+  end_time    String
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @updatedAt
+  service_id  String       @db.Uuid
+  date        DateTime?
+  reason      String?
+  type        ScheduleType
+  business    User         @relation("BusinessAvailableTime", fields: [business_id], references: [user_id])
+  service     Service      @relation(fields: [service_id], references: [service_id])
+
+  @@index([business_id, service_id, type, day_of_week])
+  @@index([business_id, service_id, type, date])
+}
+
+model Reservation {
+  reservation_id String            @id @default(uuid()) @db.Uuid
+  user_id        String            @db.Uuid
+  service_id     String            @db.Uuid
+  business_id    String            @db.Uuid
+  pet_id         String            @db.Uuid
+  status         ReservationStatus
+  notes          String?
+  created_at     DateTime          @default(now())
+  updated_at     DateTime          @updatedAt
+  price          Decimal           @default(0)
+  reserved_at    DateTime
+  business       User              @relation("BusinessReservations", fields: [business_id], references: [user_id], onDelete: Cascade)
+  pet            Pet               @relation(fields: [pet_id], references: [pet_id], onDelete: Cascade)
+  service        Service           @relation(fields: [service_id], references: [service_id], onDelete: Cascade)
+  user           User              @relation("UserReservations", fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@map("reservations")
+}
+
+model Notification {
+  notification_id String           @id @default(uuid()) @db.Uuid
+  user_id         String           @db.Uuid
+  message         String
+  is_read         Boolean          @default(false)
+  created_at      DateTime         @default(now())
+  metadata        Json?
+  title           String
+  updated_at      DateTime         @updatedAt
+  type            NotificationType
+  user            User             @relation("UserNotifications", fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([user_id, is_read])
+  @@index([created_at])
+  @@map("notifications")
+}
+
 enum ServiceCategory {
   funeral
   grooming
@@ -19,111 +125,27 @@ enum ReservationStatus {
   CONFIRMED
   CANCELED
   COMPLETED
+  IN_PROGRESS
+  REJECTED
+  NO_SHOW
 }
 
-//
-// ========== MODELS ==========
-//
-
-model User {
-  user_id      String   @id @default(uuid()) @db.Uuid
-  email        String   @unique
-  name         String
-  phone        String?
-  profileImage String?
-  address      String?
-  latitude     Float?   // 👈 추가: 위도
-  longitude    Float?
-  role         String
-  createdAt    DateTime @default(now())
-
-  // Relations
-  pets                  Pet[]
-  services              Service[]              @relation("UserServices")        // 사업자가 등록한 서비스들
-  reservations          Reservation[]          @relation("UserReservations")    // 예약한 유저로서의 예약
-  businessReservations  Reservation[]          @relation("BusinessReservations")// 사업자로서 받은 예약
-  notifications         Notification[]         @relation("UserNotifications")   // 유저의 알림들
-   businessAvailableTime  BusinessAvailableTime[] @relation("BusinessAvailableTime")
+enum ScheduleType {
+  WEEKLY
+  EXCEPTION
 }
 
-model Pet {
-  pet_id     String   @id @default(uuid()) @db.Uuid
-  user_id    String   @db.Uuid
-  name       String
-  species    String
-  breed      String?
-  age        Int?
-  weight     Float?
-  photo      String?
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  // Relations
-  user         User         @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
-  reservations Reservation[]
-}
-
-model Service {
-  service_id   String   @id @default(uuid()) @db.Uuid
-  admin_id     String   @db.Uuid
-  name         String
-  description  String
-  price        Decimal
-  category     ServiceCategory
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @updatedAt
-
-  // Relations
-  admin     User          @relation("UserServices", fields: [admin_id], references: [user_id])
-  reservations Reservation[]
-
-  @@map("services")
-}
-
-model BusinessAvailableTime {
-  id           String   @id @default(uuid())
-  business_id      String   @db.Uuid       // 사업자 ID
-  day_of_week  String                 // 'mon', 'tue', ...
-  start_time   String                 // '09:00'
-  end_time     String                 // '18:00'
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
-
-  business     User     @relation("BusinessAvailableTime", fields: [business_id], references: [user_id])
-}
-
-model Reservation {
-  reservation_id   String   @id @default(uuid()) @db.Uuid 
-  user_id          String   @db.Uuid              // 예약자
-  service_id       String   @db.Uuid              // 어떤 서비스
-  business_id      String   @db.Uuid              // 매칭된 사업자
-  pet_id           String   @db.Uuid              // 반려동물
-  reserved_at      DateTime                       // 예약 일시 (예: 2025-04-01T10:00:00Z)
-  status           ReservationStatus              // 예약 상태
-  notes            String?                        // 요청사항
-  price            Decimal     @default(0)
-
-  created_at       DateTime    @default(now())
-  updated_at       DateTime    @updatedAt
-
-  // Relations
-  user       User     @relation("UserReservations", fields: [user_id], references: [user_id], onDelete: Cascade)
-  business   User     @relation("BusinessReservations", fields: [business_id], references: [user_id], onDelete: Cascade)
-  service    Service  @relation(fields: [service_id], references: [service_id], onDelete: Cascade)
-  pet        Pet      @relation(fields: [pet_id], references: [pet_id], onDelete: Cascade)
-
-  @@map("reservations")
-}
-
-
-model Notification {
-  notification_id String   @id @default(uuid()) @db.Uuid
-  user_id         String   @db.Uuid
-  message         String
-  type            String   // 'reservation', 'system', 'etc'
-  is_read         Boolean  @default(false)
-  created_at      DateTime @default(now())
-  user            User     @relation("UserNotifications", fields: [user_id], references: [user_id], onDelete: Cascade)
-
-  @@map("notifications") // 실제 테이블명
+enum NotificationType {
+  RESERVATION_CREATED
+  RESERVATION_UPDATED
+  RESERVATION_CANCELED
+  RESERVATION_ACCEPTED
+  RESERVATION_REJECTED
+  RESERVATION_COMPLETED
+  RESERVATION_REMINDER
+  REVIEW_REQUESTED
+  REVIEW_RECEIVED
+  PAYMENT_COMPLETED
+  PAYMENT_FAILED
+  SYSTEM
 }

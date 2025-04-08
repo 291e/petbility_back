@@ -1,23 +1,58 @@
-import { IsString, IsOptional, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsDateString,
+  IsEnum,
+  Length,
+  Matches,
+} from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+
+export enum PetGender {
+  MALE = 'MALE',
+  FEMALE = 'FEMALE',
+  UNKNOWN = 'UNKNOWN',
+}
 
 export class CreatePetDto {
+  @ApiProperty({ description: '반려동물 이름', example: '멍멍이' })
   @IsString()
+  @Length(1, 30)
   name: string;
 
+  @ApiProperty({ description: '반려동물 종류', example: '강아지' })
   @IsString()
+  @Length(1, 30)
+  @Matches(/^[가-힣a-zA-Z\s]+$/, {
+    message: '종은 한글과 영문만 입력 가능합니다.',
+  })
   species: string;
 
+  @ApiProperty({ description: '반려동물 품종', example: '말티즈' })
   @IsString()
+  @Length(1, 30)
+  @Matches(/^[가-힣a-zA-Z\s]+$/, {
+    message: '품종은 한글과 영문만 입력 가능합니다.',
+  })
   breed: string;
 
+  @ApiProperty({ description: '반려동물 생년월일', example: '2020-01-01' })
+  @IsOptional()
   @IsDateString()
-  birthDate: string;
+  birthDate?: string;
 
+  @ApiProperty({
+    description: '반려동물 성별',
+    enum: PetGender,
+    example: PetGender.MALE,
+  })
+  @IsOptional()
+  @IsEnum(PetGender)
+  gender?: PetGender;
+
+  @ApiProperty({ description: '반려동물 특이사항', example: '알러지가 있음' })
   @IsOptional()
   @IsString()
-  gender?: string;
-
-  @IsOptional()
-  @IsString()
+  @Length(0, 500)
   note?: string;
 }

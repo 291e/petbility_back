@@ -18,42 +18,18 @@ export class UsersService {
     private supabaseService: SupabaseService,
   ) {}
 
-  async signUp(userData: CreateUserDto) {
-    try {
-      // 이미 존재하는 사용자인지 확인
-      const existingUser = await this.prisma.user.findUnique({
-        where: { user_id: userData.user_id },
-      });
-
-      if (existingUser) {
-        throw new BadRequestException('이미 존재하는 사용자입니다.');
-      }
-
-      return await this.prisma.user.create({
-        data: {
-          user_id: userData.user_id,
-          email: userData.email,
-          name: userData.name,
-          phone: userData.phone || null,
-          profileImage: userData.profile_image || null,
-          address: userData.address || null,
-          role: userData.role,
-          latitude: userData.latitude || null,
-          longitude: userData.longitude || null,
-        },
-        include: {
-          pets: true,
-          services: true,
-        },
-      });
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === 'P2002') {
-          throw new BadRequestException('이미 사용 중인 이메일입니다.');
-        }
-      }
-      throw error;
-    }
+  async signUp(userData: any) {
+    return this.prisma.user.create({
+      data: {
+        user_id: userData.user_id,
+        email: userData.email,
+        name: userData.name,
+        phone: userData.phone || '',
+        profileImage: userData.profileImage || '',
+        address: userData.address || '',
+        role: userData.role,
+      },
+    });
   }
 
   async getUserById(userId: string) {

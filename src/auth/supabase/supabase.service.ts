@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 @Injectable()
 export class SupabaseService {
   private supabase: SupabaseClient;
+  private readonly logger = new Logger(SupabaseService.name);
 
   constructor() {
     const supabaseUrl = process.env.SUPABASE_URL;
@@ -46,10 +47,21 @@ export class SupabaseService {
   }
 
   async getUserByToken(token: string) {
-    const { data, error } = await this.supabase.auth.getUser(token);
-    if (error) {
+    this.logger.debug(`Getting user by token: ${token.substring(0, 10)}...`);
+
+    try {
+      const { data, error } = await this.supabase.auth.getUser(token);
+
+      if (error) {
+        this.logger.error(`Error getting user: ${error.message}`);
+        return null;
+      }
+
+      this.logger.debug(`User found: ${data.user?.id}`);
+      return data.user;
+    } catch (error) {
+      this.logger.error(`Exception getting user: ${error.message}`);
       return null;
     }
-    return data.user;
   }
 }

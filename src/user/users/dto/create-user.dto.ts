@@ -42,16 +42,16 @@ export class CreateUserDto {
   })
   name: string;
 
-  @ApiProperty({
-    description: '전화번호 (10-11자리의 숫자)',
-    example: '01012345678',
-    required: false,
-  })
+  // @ApiProperty({
+  //   description: '전화번호 (10-11자리의 숫자)',
+  //   example: '01012345678',
+  //   required: false,
+  // })
   @IsOptional()
   @IsString()
-  @Matches(/^[0-9]{10,11}$/, {
-    message: '전화번호는 10-11자리의 숫자만 가능합니다.',
-  })
+  // @Matches(/^[0-9]{10,11}$/, {
+  //   message: '전화번호는 10-11자리의 숫자만 가능합니다.',
+  // })
   phone?: string;
 
   @ApiProperty({
@@ -63,11 +63,11 @@ export class CreateUserDto {
   @IsString()
   profile_image?: string;
 
-  @ApiProperty({
-    description: '주소',
-    example: '서울시 강남구 테헤란로 123',
-    required: false,
-  })
+  // @ApiProperty({
+  //   description: '주소',
+  //   example: '서울시 강남구 테헤란로 123',
+  //   required: false,
+  // })
   @IsOptional()
   @IsString()
   address?: string;

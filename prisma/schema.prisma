@@ -50,7 +50,6 @@ model Service {
   created_at            DateTime                @default(now())
   updated_at            DateTime                @updatedAt
   admin_id              String                  @db.Uuid
-  businessAvailableTime BusinessAvailableTime[]
   reservations          Reservation[]
   admin                 User                    @relation("UserServices", fields: [admin_id], references: [user_id])
 
@@ -58,22 +57,20 @@ model Service {
 }
 
 model BusinessAvailableTime {
-  id          String       @id @default(uuid())
+  business_available_time_id          String       @id @default(uuid())
   business_id String       @db.Uuid
   day_of_week String?
   start_time  String
   end_time    String
   created_at  DateTime     @default(now())
   updated_at  DateTime     @updatedAt
-  service_id  String       @db.Uuid
   date        DateTime?
   reason      String?
   type        ScheduleType
   business    User         @relation("BusinessAvailableTime", fields: [business_id], references: [user_id])
-  service     Service      @relation(fields: [service_id], references: [service_id])
 
-  @@index([business_id, service_id, type, day_of_week])
-  @@index([business_id, service_id, type, date])
+  @@index([business_id, type, day_of_week])
+  @@index([business_id, type, date])
 }
 
 model Reservation {

@@ -138,78 +138,60 @@ export class BusinessReservationsService {
   // 예약 가능 시간 관리
   async manageAvailableTime(
     business_id: string,
-    service_id: string,
     dto: ManageAvailableTimeDto,
-  ) {
+  ): Promise<void> {
     try {
-      return await this.prisma.$transaction(async (tx) => {
-        // 1. 기존 주간 일정 삭제
-        await tx.businessAvailableTime.deleteMany({
+      // 기존 주간 일정 삭제
+      await this.prisma.businessAvailableTime.deleteMany({
+        where: {
+          business_id,
+          type: ScheduleType.WEEKLY,
+        },
+      });
+
+      // 새로운 주간 일정 생성
+      await this.prisma.businessAvailableTime.createMany({
+        data: dto.weekly_schedule.map((schedule) => ({
+          business_id,
+          type: ScheduleType.WEEKLY,
+          day_of_week: schedule.day_of_week,
+          start_time: schedule.start_time,
+          end_time: schedule.end_time,
+        })),
+      });
+
+      // 예외 일정이 있는 경우 처리
+      if (dto.exception_dates && dto.exception_dates.length > 0) {
+        // 기존 예외 일정 삭제
+        await this.prisma.businessAvailableTime.deleteMany({
           where: {
             business_id,
-            service_id,
-            type: ScheduleType.WEEKLY,
-          },
-        });
-
-        // 2. 새로운 주간 일정 생성
-        const weeklySchedules = await Promise.all(
-          dto.weekly_schedule.map((schedule) =>
-            tx.businessAvailableTime.create({
-              data: {
-                business_id,
-                service_id,
-                type: ScheduleType.WEEKLY,
-                day_of_week: schedule.day_of_week,
-                start_time: schedule.start_time,
-                end_time: schedule.end_time,
-              },
-            }),
-          ),
-        );
-
-        // 3. 기존 예외 일정 삭제
-        await tx.businessAvailableTime.deleteMany({
-          where: {
-            business_id,
-            service_id,
             type: ScheduleType.EXCEPTION,
           },
         });
 
-        // 4. 새로운 예외 일정 생성
-        const exceptionSchedules = await Promise.all(
-          (dto.exception_dates || []).map((exception) =>
-            tx.businessAvailableTime.create({
-              data: {
-                business_id,
-                service_id,
-                type: ScheduleType.EXCEPTION,
-                date: new Date(exception.date),
-                start_time: exception.start_time || '00:00',
-                end_time: exception.end_time || '23:59',
-                reason: exception.reason,
-              },
-            }),
-          ),
-        );
-
-        return {
-          weekly_schedules: weeklySchedules,
-          exception_schedules: exceptionSchedules,
-        };
-      });
+        // 새로운 예외 일정 생성
+        await this.prisma.businessAvailableTime.createMany({
+          data: dto.exception_dates.map((exception) => ({
+            business_id,
+            type: ScheduleType.EXCEPTION,
+            day_of_week: exception.day_of_week,
+            start_time: exception.start_time,
+            end_time: exception.end_time,
+            reason: exception.reason,
+          })),
+        });
+      }
     } catch (error) {
-      throw new BadRequestException('예약 가능 시간 설정에 실패했습니다.');
+      throw new BadRequestException('가능 시간 관리 중 오류가 발생했습니다.');
     }
   }
 
   // 예약 가능 시간 조회
-  async getAvailableTime(business_id: string, service_id: string) {
+  async getAvailableTime(business_id: string) {
     const weeklySchedules = await this.prisma.businessAvailableTime.findMany({
       where: {
         business_id,
-        service_id,
         type: ScheduleType.WEEKLY,
       },
       orderBy: {
@@ -221,7 +203,6 @@ export class BusinessReservationsService {
       {
         where: {
           business_id,
-          service_id,
           type: ScheduleType.EXCEPTION,
         },
         orderBy: {
@@ -237,11 +218,7 @@ export class BusinessReservationsService {
   }
 
   // 특정 날짜의 예약 가능 시간 조회
-  async getAvailableTimeByDate(
-    business_id: string,
-    service_id: string,
-    date: string,
-  ) {
+  async getAvailableTimeByDate(business_id: string, date: string) {
     const targetDate = new Date(date);
     const dayOfWeek = getDayOfWeek(targetDate);
 
@@ -249,7 +226,6 @@ export class BusinessReservationsService {
     const weeklySchedule = await this.prisma.businessAvailableTime.findFirst({
       where: {
         business_id,
-        service_id,
         type: ScheduleType.WEEKLY,
         day_of_week: dayOfWeek,
       },
@@ -260,7 +236,6 @@ export class BusinessReservationsService {
       {
         where: {
           business_id,
-          service_id,
           type: ScheduleType.EXCEPTION,
           date: targetDate,
         },
@@ -271,7 +246,6 @@ export class BusinessReservationsService {
     const reservedTimes = await this.prisma.reservation.findMany({
       where: {
         business_id,
-        service_id,
         reserved_at: {
           gte: new Date(date + 'T00:00:00Z'),
           lt: new Date(date + 'T23:59:59Z'),

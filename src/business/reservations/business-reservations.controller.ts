@@ -90,19 +90,16 @@ export class BusinessReservationsController {
     description: '서비스의 예약 가능 시간을 관리합니다.',
   })
   @ApiParam({ name: 'business_id', description: '비즈니스 ID' })
-  @ApiParam({ name: 'service_id', description: '서비스 ID' })
   @ApiBody({ type: ManageAvailableTimeDto })
   @ApiResponse({ status: 200, description: '예약 가능 시간 설정 성공' })
-  @Post('available-time/:service_id')
+  @Post(':business_id/available-time')
   manageAvailableTime(
     @Param('business_id') business_id: string,
-    @Param('service_id') service_id: string,
-    @Body() manageAvailableTimeDto: ManageAvailableTimeDto,
+    @Body() dto: ManageAvailableTimeDto,
   ) {
     return this.businessReservationsService.manageAvailableTime(
       business_id,
-      service_id,
-      manageAvailableTimeDto,
+      dto,
     );
   }
 
@@ -112,17 +109,10 @@ export class BusinessReservationsController {
     description: '서비스의 모든 예약 가능 시간을 조회합니다.',
   })
   @ApiParam({ name: 'business_id', description: '비즈니스 ID' })
-  @ApiParam({ name: 'service_id', description: '서비스 ID' })
   @ApiResponse({ status: 200, description: '예약 가능 시간 조회 성공' })
-  @Get('available-time/:service_id')
-  getAvailableTime(
-    @Param('business_id') business_id: string,
-    @Param('service_id') service_id: string,
-  ) {
-    return this.businessReservationsService.getAvailableTime(
-      business_id,
-      service_id,
-    );
+  @Get(':business_id/available-time')
+  getAvailableTime(@Param('business_id') business_id: string) {
+    return this.businessReservationsService.getAvailableTime(business_id);
   }
 
   // 특정 날짜의 예약 가능 시간 조회
@@ -131,17 +121,14 @@ export class BusinessReservationsController {
     description: '특정 날짜의 예약 가능 시간을 조회합니다.',
   })
   @ApiParam({ name: 'business_id', description: '비즈니스 ID' })
-  @ApiParam({ name: 'service_id', description: '서비스 ID' })
   @ApiResponse({ status: 200, description: '예약 가능 시간 조회 성공' })
-  @Get('available-time/:service_id/date')
+  @Get(':business_id/available-time/date')
   getAvailableTimeByDate(
     @Param('business_id') business_id: string,
-    @Param('service_id') service_id: string,
     @Query('date') date: string,
   ) {
     return this.businessReservationsService.getAvailableTimeByDate(
       business_id,
-      service_id,
       date,
     );
   }

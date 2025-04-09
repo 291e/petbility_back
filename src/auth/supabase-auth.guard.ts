@@ -58,6 +58,7 @@ export class SupabaseAuthGuard implements CanActivate {
       ...userFromDB,
       phone: supabaseUser.phone || userFromDB.phone || undefined,
     };
+
     return true;
   }
 }

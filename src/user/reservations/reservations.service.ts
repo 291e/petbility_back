@@ -267,7 +267,6 @@ export class ReservationsService {
 
     const disabledDates = await this.prisma.businessAvailableTime.findMany({
       where: {
-        service_id,
         type: ScheduleType.EXCEPTION,
         OR: [
           { start_time: '00:00', end_time: '00:00' },
@@ -310,7 +309,6 @@ export class ReservationsService {
     const weeklySchedule = await this.prisma.businessAvailableTime.findFirst({
       where: {
         business_id,
-        service_id,
         type: ScheduleType.WEEKLY,
         day_of_week: dayOfWeek,
       },
@@ -321,7 +319,6 @@ export class ReservationsService {
       {
         where: {
           business_id,
-          service_id,
           type: ScheduleType.EXCEPTION,
           date: targetDate,
         },

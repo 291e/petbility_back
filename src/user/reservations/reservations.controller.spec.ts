@@ -20,10 +20,12 @@ describe('ReservationsController', () => {
     service_id: 'test-service-id',
     pet_id: 'test-pet-id',
     business_id: 'test-business-id',
-    reserved_at: addHours(new Date(), 25),
+    start_time: addHours(new Date(), 25),
+    end_time: addHours(new Date(), 26),
     status: ReservationStatus.PENDING,
     price: 30000,
     notes: '테스트 예약입니다.',
+    is_available: true,
     created_at: new Date(),
     updated_at: new Date(),
   };
@@ -83,7 +85,8 @@ describe('ReservationsController', () => {
     const createReservationDto: CreateReservationDto = {
       service_id: 'test-service-id',
       pet_id: 'test-pet-id',
-      reserved_at: addHours(new Date(), 25).toISOString(),
+      start_time: addHours(new Date(), 25).toISOString(),
+      end_time: addHours(new Date(), 26).toISOString(),
       notes: '테스트 예약입니다.',
     };
 
@@ -145,7 +148,8 @@ describe('ReservationsController', () => {
 
   describe('update', () => {
     const updateReservationDto: UpdateReservationDto = {
-      reserved_at: addHours(new Date(), 26).toISOString(),
+      start_time: addHours(new Date(), 26).toISOString(),
+      end_time: addHours(new Date(), 27).toISOString(),
       notes: '수정된 테스트 예약입니다.',
     };
 
@@ -157,6 +161,8 @@ describe('ReservationsController', () => {
       mockReservationsService.update.mockResolvedValue({
         ...mockReservationData,
         ...updateReservationDto,
+        start_time: addHours(new Date(), 26),
+        end_time: addHours(new Date(), 27),
       });
 
       const result = await controller.update(
@@ -168,6 +174,8 @@ describe('ReservationsController', () => {
       expect(result).toEqual({
         ...mockReservationData,
         ...updateReservationDto,
+        start_time: expect.any(Date),
+        end_time: expect.any(Date),
       });
       expect(mockReservationsService.update).toHaveBeenCalledWith(
         'test-reservation-id',
@@ -183,19 +191,37 @@ describe('ReservationsController', () => {
     } as Request;
 
     it('should cancel a reservation', async () => {
-      mockReservationsService.cancel.mockResolvedValue({
+      const canceledReservation = {
         ...mockReservationData,
         status: ReservationStatus.CANCELED,
-      });
+      };
+      mockReservationsService.cancel.mockResolvedValue(canceledReservation);
 
       const result = await controller.cancel(
         'test-reservation-id',
         mockRequest,
       );
 
-      expect(result.status).toBe(ReservationStatus.CANCELED);
+      expect(result).toEqual(canceledReservation);
       expect(mockReservationsService.cancel).toHaveBeenCalledWith(
         'test-reservation-id',
+        'test-user-id',
+      );
+    });
+
+    it('should handle reservation block removal', async () => {
+      const successResponse = {
+        success: true,
+        message: '차단 시간이 삭제되었습니다.',
+      };
+      mockReservationsService.cancel.mockResolvedValue(successResponse);
+
+      const result = await controller.cancel('blocked-time-id', mockRequest);
+
+      expect(result).toEqual(successResponse);
+      expect((result as { success: boolean }).success).toBe(true);
+      expect(mockReservationsService.cancel).toHaveBeenCalledWith(
+        'blocked-time-id',
         'test-user-id',
       );
     });

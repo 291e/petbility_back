@@ -7,16 +7,27 @@ import {
 import { SupabaseService } from '@/auth/supabase/supabase.service';
 import { Request } from 'express';
 import { PrismaService } from 'prisma/prisma.service';
-import { User } from '@supabase/supabase-js';
+import { Reflector } from '@nestjs/core';
+import { IS_PUBLIC_KEY } from './public.decorator';
 
 @Injectable()
 export class SupabaseAuthGuard implements CanActivate {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly prisma: PrismaService,
+    private readonly reflector: Reflector,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // Public 데코레이터가 적용된 경우 인증 건너뛰기
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isPublic) {
+      return true;
+    }
+
     const request = context.switchToHttp().getRequest<Request>();
     const authHeader = request.headers.authorization;
 

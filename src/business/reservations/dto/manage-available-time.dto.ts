@@ -1,68 +1,134 @@
+// src/business/reservations/dto/manage-available-time.dto.ts
+// 가능 시간 관리를 위한 DTO 클래스
+// 주간 일정과 예외 일정을 설정하기 위한 필드를 포함합니다.
+
 import {
   IsArray,
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsBoolean,
   ValidateNested,
+  IsObject,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class WeeklyScheduleDto {
-  @ApiProperty({ description: '요일', example: 'MONDAY' })
+  @ApiProperty({
+    description: '요일 (월,화,수,목,금,토,일)',
+    example: 'MONDAY',
+  })
   @IsString()
   @IsNotEmpty()
-  day_of_week: string;
+  dayOfWeek: string;
 
-  @ApiProperty({ description: '시작 시간', example: '09:00' })
+  @ApiProperty({
+    description: '시작 시간 (HH:mm)',
+    example: '09:00',
+  })
   @IsString()
   @IsNotEmpty()
-  start_time: string;
+  startTime: string;
 
-  @ApiProperty({ description: '종료 시간', example: '18:00' })
+  @ApiProperty({
+    description: '종료 시간 (HH:mm)',
+    example: '18:00',
+  })
   @IsString()
   @IsNotEmpty()
-  end_time: string;
+  endTime: string;
+
+  @ApiProperty({
+    description: '휴무일 여부',
+    example: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  isDayOff?: boolean;
 }
 
-export class ExceptionDateDto {
-  @ApiProperty({ description: '요일', example: 'MONDAY' })
+export class BreakTimeDto {
+  @ApiProperty({
+    description: '요일 또는 특정 날짜 (YYYY-MM-DD)',
+    example: 'MONDAY',
+  })
   @IsString()
   @IsNotEmpty()
-  day_of_week: string;
+  dayOfWeek: string;
 
-  @ApiProperty({ description: '시작 시간', example: '12:00' })
+  @ApiProperty({
+    description: '시작 시간 (HH:mm)',
+    example: '12:00',
+  })
   @IsString()
   @IsNotEmpty()
-  start_time: string;
+  startTime: string;
 
-  @ApiProperty({ description: '종료 시간', example: '13:00' })
+  @ApiProperty({
+    description: '종료 시간 (HH:mm)',
+    example: '13:00',
+  })
   @IsString()
   @IsNotEmpty()
-  end_time: string;
+  endTime: string;
 
-  @ApiProperty({ description: '휴식 시간 사유', example: '휴식 시간' })
+  @ApiProperty({
+    description: '휴식 시간 사유',
+    example: '점심 시간',
+    required: false,
+  })
   @IsString()
-  @IsNotEmpty()
-  reason: string;
+  @IsOptional()
+  reason?: string;
+}
+
+export class ScheduleDto {
+  @ApiProperty({ description: '영업 시작 시간', example: '09:00' })
+  @IsString()
+  startTime: string;
+
+  @ApiProperty({ description: '영업 종료 시간', example: '18:00' })
+  @IsString()
+  endTime: string;
+
+  @ApiProperty({ description: '휴식 시간', type: BreakTimeDto })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => BreakTimeDto)
+  breakTime: BreakTimeDto;
+
+  @ApiProperty({
+    description: '영업 요일 (일~토)',
+    example: [true, true, true, true, true, true, false],
+  })
+  @IsArray()
+  @IsBoolean({ each: true })
+  selectedDays: boolean[];
 }
 
 export class ManageAvailableTimeDto {
-  @ApiProperty({ description: '주간 일정', type: [WeeklyScheduleDto] })
-  @IsArray()
-  @ValidateNested({ each: true }) // ✅ 추가
-  @Type(() => WeeklyScheduleDto) // ✅ 추가
-  @IsNotEmpty()
-  weekly_schedule: WeeklyScheduleDto[];
-
   @ApiProperty({
-    description: '예외 일정',
-    type: [ExceptionDateDto],
-    required: false,
+    description: '주간 스케줄 목록',
+    type: [WeeklyScheduleDto],
   })
   @IsArray()
-  @ValidateNested({ each: true }) // ✅ 추가
-  @Type(() => ExceptionDateDto) // ✅ 추가
-  @IsOptional()
-  exception_dates?: ExceptionDateDto[];
+  @ValidateNested({ each: true })
+  @Type(() => WeeklyScheduleDto)
+  weeklySchedules: WeeklyScheduleDto[];
+
+  @ApiProperty({
+    description: '휴식 시간 목록',
+    type: [BreakTimeDto],
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BreakTimeDto)
+  breakTimes: BreakTimeDto[];
+
+  @ApiProperty({ description: '전체 스케줄 설정', type: ScheduleDto })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => ScheduleDto)
+  schedule: ScheduleDto;
 }

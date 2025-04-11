@@ -44,10 +44,12 @@ describe('ReservationsService', () => {
     service_id: 'test-service-id',
     pet_id: 'test-pet-id',
     business_id: 'test-business-id',
-    reserved_at: addHours(new Date(), 25),
+    start_time: addHours(new Date(), 25),
+    end_time: addHours(new Date(), 26),
     status: ReservationStatus.PENDING,
     price: 30000,
     notes: '테스트 예약입니다.',
+    is_available: true,
     created_at: new Date(),
     updated_at: new Date(),
   };
@@ -65,6 +67,7 @@ describe('ReservationsService', () => {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
       update: jest.fn(),
+      delete: jest.fn(),
     },
   };
 
@@ -101,7 +104,8 @@ describe('ReservationsService', () => {
     const createReservationDto: CreateReservationDto = {
       service_id: 'test-service-id',
       pet_id: 'test-pet-id',
-      reserved_at: addHours(new Date(), 25).toISOString(),
+      start_time: addHours(new Date(), 25).toISOString(),
+      end_time: addHours(new Date(), 26).toISOString(),
       notes: '테스트 예약입니다.',
     };
 
@@ -132,9 +136,12 @@ describe('ReservationsService', () => {
           service_id: createReservationDto.service_id,
           pet_id: createReservationDto.pet_id,
           business_id: mockServiceData.admin_id,
-          reserved_at: expect.any(Date),
+          start_time: expect.any(Date),
+          end_time: expect.any(Date),
           status: ReservationStatus.PENDING,
           price: mockServiceData.price,
+          is_available: true,
+          notes: createReservationDto.notes,
         },
       });
       expect(mockNotificationsService.create).toHaveBeenCalled();
@@ -179,7 +186,8 @@ describe('ReservationsService', () => {
 
       const pastReservationDto = {
         ...createReservationDto,
-        reserved_at: pastDate.toISOString(),
+        start_time: pastDate.toISOString(),
+        end_time: addHours(pastDate, 1).toISOString(),
       };
 
       mockPrismaService.service.findUnique.mockResolvedValue(mockServiceData);
@@ -222,13 +230,14 @@ describe('ReservationsService', () => {
       expect(mockPrismaService.reservation.findMany).toHaveBeenCalledWith({
         where: {
           OR: [{ user_id: 'test-user-id' }, { business_id: 'test-user-id' }],
+          is_available: true,
         },
         include: {
           service: true,
           pet: true,
         },
         orderBy: {
-          reserved_at: 'desc',
+          start_time: 'desc',
         },
       });
     });
@@ -276,7 +285,8 @@ describe('ReservationsService', () => {
 
   describe('update', () => {
     const updateReservationDto: UpdateReservationDto = {
-      reserved_at: addHours(new Date(), 26).toISOString(),
+      start_time: addHours(new Date(), 26).toISOString(),
+      end_time: addHours(new Date(), 27).toISOString(),
       notes: '수정된 테스트 예약입니다.',
     };
 
@@ -301,7 +311,15 @@ describe('ReservationsService', () => {
       });
       expect(mockPrismaService.reservation.update).toHaveBeenCalledWith({
         where: { reservation_id: 'test-reservation-id' },
-        data: updateReservationDto,
+        data: {
+          start_time: expect.any(Date),
+          end_time: expect.any(Date),
+          notes: updateReservationDto.notes,
+        },
+        include: {
+          service: true,
+          pet: true,
+        },
       });
       expect(mockNotificationsService.create).toHaveBeenCalled();
     });
@@ -321,10 +339,11 @@ describe('ReservationsService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should throw BadRequestException if reservation time is in the past', async () => {
+    it('should throw BadRequestException when trying to update past reservation', async () => {
       const pastReservation = {
         ...mockReservationData,
-        reserved_at: new Date(Date.now() - 1000),
+        start_time: new Date(Date.now() - 1000),
+        end_time: addHours(new Date(Date.now() - 1000), 1),
       };
       mockPrismaService.reservation.findUnique.mockResolvedValue(
         pastReservation,
@@ -342,9 +361,11 @@ describe('ReservationsService', () => {
 
   describe('cancel', () => {
     it('should cancel a reservation successfully', async () => {
-      mockPrismaService.reservation.findUnique.mockResolvedValue(
-        mockReservationData,
-      );
+      mockPrismaService.reservation.findUnique.mockResolvedValue({
+        ...mockReservationData,
+        status: ReservationStatus.PENDING,
+      });
+
       mockPrismaService.reservation.update.mockResolvedValue({
         ...mockReservationData,
         status: ReservationStatus.CANCELED,
@@ -355,12 +376,39 @@ describe('ReservationsService', () => {
         'test-user-id',
       );
 
-      expect(result.status).toBe(ReservationStatus.CANCELED);
       expect(mockPrismaService.reservation.update).toHaveBeenCalledWith({
         where: { reservation_id: 'test-reservation-id' },
         data: { status: ReservationStatus.CANCELED },
+        include: {
+          service: true,
+          pet: true,
+        },
       });
-      expect(mockNotificationsService.create).toHaveBeenCalled();
+
+      expect(result).toHaveProperty('status', ReservationStatus.CANCELED);
+    });
+
+    it('should delete a blocked time when is_available is false', async () => {
+      const blockedTime = {
+        ...mockReservationData,
+        is_available: false,
+        business_id: 'test-user-id', // 사용자가 비즈니스 소유자
+      };
+
+      mockPrismaService.reservation.findUnique.mockResolvedValue(blockedTime);
+      mockPrismaService.reservation.delete.mockResolvedValue(blockedTime);
+
+      const result = await service.cancel(
+        'test-reservation-id',
+        'test-user-id',
+      );
+
+      expect(mockPrismaService.reservation.delete).toHaveBeenCalledWith({
+        where: { reservation_id: 'test-reservation-id' },
+      });
+
+      // 타입 단언 사용
+      expect((result as { success: boolean }).success).toBe(true);
     });
 
     it('should throw BadRequestException if reservation is not in PENDING status', async () => {

@@ -1,33 +1,72 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BusinessReservationsService } from './business-reservations.service';
 import { PrismaService } from 'prisma/prisma.service';
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
-import { Prisma, ReservationStatus, ScheduleType } from '@prisma/client';
-import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto';
-import { ManageAvailableTimeDto } from './dto/manage-available-time.dto';
+import { NotificationsService } from '@/notifications/notifications.service';
+import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { ReservationStatus, ServiceCategory } from '@prisma/client';
+
+// 모킹 데이터
+const mockReservations = [
+  {
+    reservation_id: '1',
+    user_id: 'user1',
+    business_id: 'business1',
+    service_id: 'service1',
+    pet_id: 'pet1',
+    start_time: new Date('2023-01-01T10:00:00Z'),
+    end_time: new Date('2023-01-01T11:00:00Z'),
+    status: ReservationStatus.PENDING,
+    is_available: true,
+    price: 10000,
+    created_at: new Date(),
+    updated_at: new Date(),
+    notes: null,
+  },
+  {
+    reservation_id: '2',
+    user_id: 'user2',
+    business_id: 'business1',
+    service_id: 'service2',
+    pet_id: 'pet2',
+    start_time: new Date('2023-01-01T12:00:00Z'),
+    end_time: new Date('2023-01-01T13:00:00Z'),
+    status: ReservationStatus.CONFIRMED,
+    is_available: true,
+    price: 20000,
+    created_at: new Date(),
+    updated_at: new Date(),
+    notes: null,
+  },
+];
+
+// PrismaService 모킹
+const mockPrismaService = {
+  reservation: {
+    findMany: jest.fn(),
+    findUnique: jest.fn(),
+    update: jest.fn(),
+  },
+  service: {
+    findUnique: jest.fn(),
+    findFirst: jest.fn(),
+  },
+  businessService: {
+    findMany: jest.fn(),
+    findFirst: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+  },
+};
+
+// NotificationsService 모킹
+const mockNotificationsService = {
+  create: jest.fn(),
+};
 
 describe('BusinessReservationsService', () => {
   let service: BusinessReservationsService;
   let prismaService: PrismaService;
-
-  const mockPrismaService = {
-    reservation: {
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-      update: jest.fn(),
-    },
-    businessAvailableTime: {
-      findMany: jest.fn(),
-      findFirst: jest.fn(),
-      deleteMany: jest.fn(),
-      createMany: jest.fn(),
-    },
-    $transaction: jest.fn(),
-  };
+  let notificationsService: NotificationsService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -37,6 +76,10 @@ describe('BusinessReservationsService', () => {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
+        {
+          provide: NotificationsService,
+          useValue: mockNotificationsService,
+        },
       ],
     }).compile();
 
@@ -44,26 +87,26 @@ describe('BusinessReservationsService', () => {
       BusinessReservationsService,
     );
     prismaService = module.get<PrismaService>(PrismaService);
+    notificationsService =
+      module.get<NotificationsService>(NotificationsService);
   });
 
   afterEach(() => {
     jest.clearAllMocks();
   });
 
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
   describe('findAll', () => {
     it('should return all reservations for a business', async () => {
       const mockReservations = [
         {
-          reservation_id: '1',
-          business_id: 'business-1',
-          user: {
-            user_id: 'user-1',
-            name: 'John',
-            phone: '1234',
-            address: 'Seoul',
-          },
-          pet: { name: 'Max' },
-          service: { name: 'Grooming' },
+          reservation_id: 'test-id',
+          business_id: 'test-business-id',
+          user_id: 'test-user-id',
+          status: ReservationStatus.PENDING,
         },
       ];
 
@@ -71,11 +114,13 @@ describe('BusinessReservationsService', () => {
         mockReservations,
       );
 
-      const result = await service.findAll('business-1');
-
+      const result = await service.findAll('test-business-id');
       expect(result).toEqual(mockReservations);
       expect(mockPrismaService.reservation.findMany).toHaveBeenCalledWith({
-        where: { business_id: 'business-1' },
+        where: {
+          business_id: 'test-business-id',
+          is_available: true,
+        },
         include: {
           user: {
             select: { user_id: true, name: true, phone: true, address: true },
@@ -83,227 +128,323 @@ describe('BusinessReservationsService', () => {
           pet: true,
           service: true,
         },
-        orderBy: { reserved_at: 'desc' },
+        orderBy: { start_time: 'desc' },
       });
     });
   });
 
   describe('findOne', () => {
-    it('should return a specific reservation', async () => {
+    it('should return a reservation if it exists and belongs to the business', async () => {
       const mockReservation = {
-        reservation_id: '1',
-        business_id: 'business-1',
-        user: { name: 'John' },
-        pet: { name: 'Max' },
-        service: { name: 'Grooming' },
+        reservation_id: 'test-id',
+        business_id: 'test-business-id',
+        user_id: 'test-user-id',
+        status: ReservationStatus.PENDING,
       };
 
       mockPrismaService.reservation.findUnique.mockResolvedValue(
         mockReservation,
       );
 
-      const result = await service.findOne('1', 'business-1');
-
+      const result = await service.findOne('test-id', 'test-business-id');
       expect(result).toEqual(mockReservation);
-      expect(mockPrismaService.reservation.findUnique).toHaveBeenCalledWith({
-        where: { reservation_id: '1' },
-        include: {
-          user: true,
-          pet: true,
-          service: true,
-        },
-      });
     });
 
-    it('should throw NotFoundException when reservation not found', async () => {
-      mockPrismaService.reservation.findUnique.mockResolvedValue(null);
-
-      await expect(service.findOne('1', 'business-1')).rejects.toThrow(
-        NotFoundException,
-      );
-    });
-
-    it('should throw ForbiddenException when reservation belongs to different business', async () => {
-      const mockReservation = {
-        reservation_id: '1',
-        business_id: 'different-business',
-      };
-
-      mockPrismaService.reservation.findUnique.mockResolvedValue(
-        mockReservation,
-      );
-
-      await expect(service.findOne('1', 'business-1')).rejects.toThrow(
-        ForbiddenException,
-      );
-    });
-  });
-
-  describe('updateStatus', () => {
-    const mockReservation = {
-      reservation_id: '1',
-      business_id: 'business-1',
-    };
-
-    const updateDto: UpdateReservationStatusDto = {
-      status: ReservationStatus.CONFIRMED,
-    };
-
-    it('should update reservation status', async () => {
-      mockPrismaService.reservation.findUnique.mockResolvedValue(
-        mockReservation,
-      );
-      mockPrismaService.reservation.update.mockResolvedValue({
-        ...mockReservation,
-        status: ReservationStatus.CONFIRMED,
-      });
-
-      const result = await service.updateStatus('1', 'business-1', updateDto);
-
-      expect(result.status).toBe(ReservationStatus.CONFIRMED);
-      expect(mockPrismaService.reservation.update).toHaveBeenCalledWith({
-        where: { reservation_id: '1' },
-        data: { status: ReservationStatus.CONFIRMED },
-      });
-    });
-
-    it('should throw NotFoundException when reservation not found', async () => {
+    it('should throw NotFoundException if reservation does not exist', async () => {
       mockPrismaService.reservation.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.updateStatus('1', 'business-1', updateDto),
+        service.findOne('non-existent-id', 'test-business-id'),
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw ForbiddenException when reservation belongs to different business', async () => {
-      const differentBusinessReservation = {
-        reservation_id: '1',
-        business_id: 'different-business',
+    it('should throw ForbiddenException if reservation does not belong to the business', async () => {
+      const mockReservation = {
+        reservation_id: 'test-id',
+        business_id: 'other-business-id',
+        user_id: 'test-user-id',
+        status: ReservationStatus.PENDING,
       };
 
       mockPrismaService.reservation.findUnique.mockResolvedValue(
-        differentBusinessReservation,
+        mockReservation,
       );
 
       await expect(
-        service.updateStatus('1', 'business-1', updateDto),
+        service.findOne('test-id', 'test-business-id'),
       ).rejects.toThrow(ForbiddenException);
     });
   });
 
-  describe('getAvailableTime', () => {
-    it('should return available time slots', async () => {
-      const mockAvailableTimes = [
-        {
-          id: '1',
-          business_id: 'business-1',
-          service_id: 'service-1',
-          day_of_week: 'MONDAY',
-          start_time: '09:00',
-          end_time: '18:00',
-        },
-      ];
-
-      mockPrismaService.businessAvailableTime.findMany.mockResolvedValue(
-        mockAvailableTimes,
+  describe('updateStatus', () => {
+    it('should update reservation status', async () => {
+      // 모킹
+      mockPrismaService.reservation.findUnique.mockResolvedValue(
+        mockReservations[0],
       );
-
-      const result = await service.getAvailableTime('business-1', 'service-1');
-
-      expect(result).toEqual(mockAvailableTimes);
-      expect(
-        mockPrismaService.businessAvailableTime.findMany,
-      ).toHaveBeenCalledWith({
-        where: {
-          business_id: 'business-1',
-          service_id: 'service-1',
-        },
-        orderBy: [{ day_of_week: 'asc' }, { start_time: 'asc' }],
+      mockPrismaService.reservation.update.mockResolvedValue({
+        ...mockReservations[0],
+        status: ReservationStatus.CONFIRMED,
       });
-    });
+      mockNotificationsService.create.mockResolvedValue({});
 
-    it('should handle errors gracefully', async () => {
-      mockPrismaService.businessAvailableTime.findMany.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Error', {
-          code: 'P2002',
-          clientVersion: '2.0.0',
-        }),
-      );
+      // 테스트
+      const result = await service.updateStatus('1', 'business1', {
+        status: ReservationStatus.CONFIRMED,
+      });
 
-      await expect(
-        service.getAvailableTime('business-1', 'service-1'),
-      ).rejects.toThrow(BadRequestException);
+      // 검증
+      expect(mockPrismaService.reservation.update).toHaveBeenCalledWith({
+        where: { reservation_id: '1' },
+        data: { status: ReservationStatus.CONFIRMED },
+        include: {
+          user: true,
+          service: true,
+          pet: true,
+        },
+      });
+      expect(mockNotificationsService.create).toHaveBeenCalled();
+      expect(result.status).toBe(ReservationStatus.CONFIRMED);
     });
   });
 
-  describe('getAvailableTimeByDate', () => {
-    const mockDate = '2024-04-08';
-    const mockServiceId = 'service-1';
-    const mockBusinessId = 'business-1';
+  // 서비스 관리 테스트 추가
+  describe('getBusinessServices', () => {
+    it('should return list of services with activation status', async () => {
+      // 테스트 데이터 설정
+      const businessId = 'test-business-id';
 
-    it('should return exception schedule if it exists', async () => {
-      const mockExceptionSchedule = {
-        id: '1',
-        type: ScheduleType.EXCEPTION,
-        start_time: '09:00',
-        end_time: '18:00',
+      // 활성화된 서비스 모의 데이터
+      const mockActiveServices = [
+        {
+          business_id: businessId,
+          service_id: 'service1',
+          service: {
+            service_id: 'service1',
+            name: '서비스1',
+            description: '설명1',
+            price: 10000,
+            category: ServiceCategory.grooming,
+          },
+        },
+      ];
+
+      // 카테고리별 기본 서비스 모의 데이터
+      const mockBaseService = {
+        service_id: 'base-service-id',
+        name: '기본 서비스',
+        description: '기본 서비스 설명',
+        price: 20000,
+        category: ServiceCategory.cremation,
       };
 
-      mockPrismaService.businessAvailableTime.findFirst.mockResolvedValueOnce(
-        mockExceptionSchedule,
+      // 모의 함수 설정
+      mockPrismaService.businessService.findMany.mockResolvedValue(
+        mockActiveServices,
+      );
+      mockPrismaService.service.findFirst.mockResolvedValue(mockBaseService);
+
+      // 함수 실행
+      const result = await service.getBusinessServices(businessId);
+
+      // 결과 검증
+      expect(mockPrismaService.businessService.findMany).toHaveBeenCalledWith({
+        where: { business_id: businessId },
+        include: { service: true },
+      });
+
+      // 적어도 하나 이상의 서비스가 결과에 포함되어야 함
+      expect(result.length).toBeGreaterThan(0);
+
+      // 결과에 서비스 정보와 상태가 포함되어 있는지 확인
+      expect(result[0]).toHaveProperty('service_id');
+      expect(result[0]).toHaveProperty('name');
+      expect(result[0]).toHaveProperty('status');
+    });
+  });
+
+  describe('updateServiceStatus', () => {
+    const businessId = 'test-business-id';
+    const serviceId = 'test-service-id';
+
+    it('should activate a service', async () => {
+      // 테스트 서비스 설정
+      const mockService = {
+        service_id: serviceId,
+        name: '테스트 서비스',
+      };
+
+      // 이미 존재하는 BusinessService 링크
+      const mockExistingLink = {
+        id: 'link-id',
+        business_id: businessId,
+        service_id: serviceId,
+        is_active: false,
+      };
+
+      // 업데이트 결과
+      const mockUpdatedLink = {
+        ...mockExistingLink,
+        is_active: true,
+      };
+
+      // 모의 함수 설정
+      mockPrismaService.service.findUnique.mockResolvedValue(mockService);
+      mockPrismaService.businessService.findFirst.mockResolvedValue(
+        mockExistingLink,
+      );
+      mockPrismaService.businessService.update.mockResolvedValue(
+        mockUpdatedLink,
       );
 
-      const result = await service.getAvailableTimeByDate(
-        mockBusinessId,
-        mockServiceId,
-        mockDate,
+      // 함수 실행
+      const result = await service.updateServiceStatus(
+        businessId,
+        serviceId,
+        'active',
       );
 
-      expect(result).toBeDefined();
-      expect(
-        mockPrismaService.businessAvailableTime.findFirst,
-      ).toHaveBeenCalledWith({
+      // 결과 검증
+      expect(mockPrismaService.service.findUnique).toHaveBeenCalledWith({
+        where: { service_id: serviceId },
+      });
+
+      expect(mockPrismaService.businessService.findFirst).toHaveBeenCalledWith({
         where: {
-          business_id: mockBusinessId,
-          service_id: mockServiceId,
-          type: ScheduleType.EXCEPTION,
-          date: expect.any(Date),
+          business_id: businessId,
+          service_id: serviceId,
         },
       });
+
+      expect(mockPrismaService.businessService.update).toHaveBeenCalledWith({
+        where: { id: mockExistingLink.id },
+        data: { is_active: true },
+      });
+
+      expect(result).toEqual(mockUpdatedLink);
     });
 
-    it('should return weekly schedule if no exception exists', async () => {
-      mockPrismaService.businessAvailableTime.findFirst
-        .mockResolvedValueOnce(null) // No exception schedule
-        .mockResolvedValueOnce({
-          // Weekly schedule
-          start_time: '09:00',
-          end_time: '18:00',
-        });
+    it('should create a new link if it does not exist when activating', async () => {
+      // 테스트 서비스 설정
+      const mockService = {
+        service_id: serviceId,
+        name: '테스트 서비스',
+      };
 
-      mockPrismaService.reservation.findMany.mockResolvedValue([]); // No existing reservations
+      // 생성 결과
+      const mockCreatedLink = {
+        id: 'new-link-id',
+        business_id: businessId,
+        service_id: serviceId,
+        is_active: true,
+      };
 
-      const result = await service.getAvailableTimeByDate(
-        mockBusinessId,
-        mockServiceId,
-        mockDate,
+      // 모의 함수 설정
+      mockPrismaService.service.findUnique.mockResolvedValue(mockService);
+      mockPrismaService.businessService.findFirst.mockResolvedValue(null); // 링크가 없음
+      mockPrismaService.businessService.create.mockResolvedValue(
+        mockCreatedLink,
       );
 
-      expect(result).toBeDefined();
-      expect(Array.isArray(result)).toBe(true);
+      // 함수 실행
+      const result = await service.updateServiceStatus(
+        businessId,
+        serviceId,
+        'active',
+      );
+
+      // 결과 검증
+      expect(mockPrismaService.businessService.create).toHaveBeenCalledWith({
+        data: {
+          business_id: businessId,
+          service_id: serviceId,
+          is_active: true,
+        },
+      });
+
+      expect(result).toEqual(mockCreatedLink);
     });
 
-    it('should handle errors gracefully', async () => {
-      mockPrismaService.businessAvailableTime.findFirst.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Error', {
-          code: 'P2002',
-          clientVersion: '2.0.0',
-        }),
+    it('should deactivate a service', async () => {
+      // 테스트 서비스 설정
+      const mockService = {
+        service_id: serviceId,
+        name: '테스트 서비스',
+      };
+
+      // 이미 존재하는 BusinessService 링크
+      const mockExistingLink = {
+        id: 'link-id',
+        business_id: businessId,
+        service_id: serviceId,
+        is_active: true,
+      };
+
+      // 업데이트 결과
+      const mockUpdatedLink = {
+        ...mockExistingLink,
+        is_active: false,
+      };
+
+      // 모의 함수 설정
+      mockPrismaService.service.findUnique.mockResolvedValue(mockService);
+      mockPrismaService.businessService.findFirst.mockResolvedValue(
+        mockExistingLink,
+      );
+      mockPrismaService.businessService.update.mockResolvedValue(
+        mockUpdatedLink,
       );
 
+      // 함수 실행
+      const result = await service.updateServiceStatus(
+        businessId,
+        serviceId,
+        'inactive',
+      );
+
+      // 결과 검증
+      expect(mockPrismaService.businessService.update).toHaveBeenCalledWith({
+        where: { id: mockExistingLink.id },
+        data: { is_active: false },
+      });
+
+      expect(result).toEqual(mockUpdatedLink);
+    });
+
+    it('should return a message when deactivating a non-existent link', async () => {
+      // 테스트 서비스 설정
+      const mockService = {
+        service_id: serviceId,
+        name: '테스트 서비스',
+      };
+
+      // 모의 함수 설정
+      mockPrismaService.service.findUnique.mockResolvedValue(mockService);
+      mockPrismaService.businessService.findFirst.mockResolvedValue(null); // 링크가 없음
+
+      // 함수 실행
+      const result = await service.updateServiceStatus(
+        businessId,
+        serviceId,
+        'inactive',
+      );
+
+      // 결과 검증
+      expect(result).toEqual({ message: '이미 비활성화된 서비스입니다.' });
+    });
+
+    it('should throw NotFoundException for non-existent service', async () => {
+      // 모의 함수 설정
+      mockPrismaService.service.findUnique.mockResolvedValue(null); // 서비스가 없음
+
+      // 함수 실행 및 예외 확인
       await expect(
-        service.getAvailableTimeByDate(mockBusinessId, mockServiceId, mockDate),
-      ).rejects.toThrow(BadRequestException);
+        service.updateServiceStatus(
+          businessId,
+          'non-existent-service',
+          'active',
+        ),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

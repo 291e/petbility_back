@@ -9,9 +9,10 @@ import { ReservationsController } from './reservations/reservations.controller';
 import { ReservationsService } from './reservations/reservations.service';
 import { NotificationsModule } from '@/notifications/notifications.module';
 import { SupabaseService } from '@/auth/supabase/supabase.service';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
-  imports: [PrismaModule, SupabaseModule, NotificationsModule],
+  imports: [PrismaModule, SupabaseModule, NotificationsModule, HttpModule],
   controllers: [UsersController, PetsController, ReservationsController],
   providers: [UsersService, PetsService, ReservationsService, SupabaseService],
   exports: [UsersService],

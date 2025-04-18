@@ -217,7 +217,11 @@ export class BusinessScheduleService {
     reservations.forEach((reservation) => {
       blockedTimes.push({
         start: format(reservation.start_time, 'HH:mm'),
-        end: format(reservation.end_time, 'HH:mm'),
+        end: format(
+          reservation.end_time ||
+            new Date(reservation.start_time.getTime() + 60 * 60000),
+          'HH:mm',
+        ),
       });
     });
 

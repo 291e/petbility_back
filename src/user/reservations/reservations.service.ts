@@ -644,14 +644,20 @@ export class ReservationsService {
       blockedTimes.forEach((time) => {
         blockedTimeSlots.push({
           start: format(time.start_time, 'HH:mm'),
-          end: format(time.end_time, 'HH:mm'),
+          end: format(
+            time.end_time || new Date(time.start_time.getTime() + 60 * 60000),
+            'HH:mm',
+          ),
         });
       });
 
       reservedTimes.forEach((time) => {
         blockedTimeSlots.push({
           start: format(time.start_time, 'HH:mm'),
-          end: format(time.end_time, 'HH:mm'),
+          end: format(
+            time.end_time || new Date(time.start_time.getTime() + 60 * 60000),
+            'HH:mm',
+          ),
         });
       });
 
@@ -759,14 +765,20 @@ export class ReservationsService {
     blockedTimes.forEach((time) => {
       blockedTimeSlots.push({
         start: format(time.start_time, 'HH:mm'),
-        end: format(time.end_time, 'HH:mm'),
+        end: format(
+          time.end_time || new Date(time.start_time.getTime() + 60 * 60000),
+          'HH:mm',
+        ),
       });
     });
 
     reservedTimes.forEach((time) => {
       blockedTimeSlots.push({
         start: format(time.start_time, 'HH:mm'),
-        end: format(time.end_time, 'HH:mm'),
+        end: format(
+          time.end_time || new Date(time.start_time.getTime() + 30 * 60000),
+          'HH:mm',
+        ),
       });
     });
 

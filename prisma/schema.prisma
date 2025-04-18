@@ -25,6 +25,8 @@ model User {
   services              Service[]               @relation("UserServices")
   businessSchedules     BusinessSchedule[]      @relation("BusinessSchedules")
   businessServices      BusinessService[]       @relation("BusinessToServices")
+  payments              Payment[]               @relation("UserPayments")
+  businessPayments      Payment[]               @relation("BusinessPayments")
 }
 
 model Pet {
@@ -54,6 +56,7 @@ model Service {
   reservations          Reservation[]
   admin                 User                    @relation("UserServices", fields: [admin_id], references: [user_id])
   businessServices      BusinessService[]       @relation("ServiceToBusinesses")
+  payments              Payment[]
 
   @@map("services")
 }
@@ -70,8 +73,8 @@ model Reservation {
   updated_at    DateTime          @updatedAt
   price         Decimal           @default(0)
   start_time    DateTime
-  end_time      DateTime
-  is_available  Boolean           @default(true)
+  end_time      DateTime?         // 선택적 필드로 변경
+  is_available  Boolean           @default(true)  // 예약 가능 여부
   business      User              @relation("BusinessReservations", fields: [business_id], references: [user_id], onDelete: Cascade)
   pet           Pet?              @relation(fields: [pet_id], references: [pet_id], onDelete: Cascade)
   service       Service?          @relation(fields: [service_id], references: [service_id], onDelete: Cascade)
@@ -139,6 +142,7 @@ enum PaymentStatus {
   READY        // 결제 준비
   IN_PROGRESS  // 결제 진행중
   WAITING_FOR_DEPOSIT // 가상계좌 입금 대기
+  PENDING      // 결제 대기
   DONE         // 결제 완료
   CANCELED     // 결제 취소
   ABORTED      // 결제 중단
@@ -156,9 +160,12 @@ enum PaymentMethod {
 
 model Payment {
   payment_id      String        @id @default(uuid()) @db.Uuid
-  reservation_id  String        @db.Uuid
-  order_id       String        // 주문 번호 (가맹점에서 생성한 주문 번호)
-  payment_key    String?       // 토스 페이먼츠 결제 키
+  service_id      String        @db.Uuid
+  business_id     String        @db.Uuid
+  user_id         String        @db.Uuid
+  reservation_id  String?       @db.Uuid
+  orderId        String        // 주문 번호 (가맹점에서 생성한 주문 번호)
+  paymentKey     String?       // 토스 페이먼츠 결제 키
   status         PaymentStatus
   method         PaymentMethod
   amount         Decimal
@@ -184,18 +191,21 @@ model Payment {
   receipt_url    String?      // 영수증 URL
   
   // 결제 요청 정보
-  customer_name          String?  // 구매자 이름
-  customer_email         String?  // 구매자 이메일
-  customer_mobile_phone  String?  // 구매자 전화번호
+  success_url   String?       // 성공 URL
+  fail_url      String?       // 실패 URL
+  memo          String?       // 메모
   
   // 메타데이터
   metadata       Json?         // 가맹점에서 전달한 추가 정보
   
   // 관계
-  reservation    Reservation   @relation(fields: [reservation_id], references: [reservation_id], onDelete: Cascade)
+  service        Service       @relation(fields: [service_id], references: [service_id], onDelete: Cascade)
+  business       User          @relation("BusinessPayments", fields: [business_id], references: [user_id], onDelete: Cascade)
+  user           User          @relation("UserPayments", fields: [user_id], references: [user_id], onDelete: Cascade)
+  reservation    Reservation?  @relation(fields: [reservation_id], references: [reservation_id], onDelete: Cascade)
 
-  @@index([order_id])
-  @@index([payment_key])
+  @@index([orderId])
+  @@index([paymentKey])
   @@index([status])
   @@index([requested_at])
   @@map("payments")

@@ -2,13 +2,18 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 dotenv.config({ path: path.resolve(__dirname, '@/.env') });
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // 로깅 설정 추가
+  const logger = new Logger('Bootstrap');
+
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+  });
 
   // 전역 파이프 설정
   app.useGlobalPipes(
@@ -38,8 +43,8 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`Application is running on: http://localhost:${port}`);
-  console.log(
+  logger.log(`Application is running on: http://localhost:${port}`);
+  logger.log(
     `Swagger documentation is available at: http://localhost:${port}/api`,
   );
 }

@@ -4,13 +4,25 @@ import { PrismaService } from 'prisma/prisma.service';
 import { NotificationsService } from '@/notifications/notifications.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
-import { ReservationStatus } from '@prisma/client';
+import { ReservationStatus, ServiceCategory } from '@prisma/client';
 import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { addHours, addDays } from 'date-fns';
+
+// NotificationsService 모킹
+jest.mock('@/notifications/notifications.service', () => {
+  return {
+    NotificationsService: jest.fn().mockImplementation(() => {
+      return {
+        create: jest.fn().mockResolvedValue({}),
+      };
+    }),
+  };
+});
 
 describe('ReservationsService', () => {
   let service: ReservationsService;
@@ -57,8 +69,12 @@ describe('ReservationsService', () => {
   const mockPrismaService = {
     service: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
     },
     pet: {
+      findUnique: jest.fn(),
+    },
+    user: {
       findUnique: jest.fn(),
     },
     reservation: {
@@ -69,10 +85,16 @@ describe('ReservationsService', () => {
       update: jest.fn(),
       delete: jest.fn(),
     },
+    businessSchedule: {
+      findFirst: jest.fn(),
+    },
+    businessService: {
+      findMany: jest.fn(),
+    },
   };
 
   const mockNotificationsService = {
-    create: jest.fn(),
+    create: jest.fn().mockResolvedValue({}),
   };
 
   beforeEach(async () => {
@@ -113,7 +135,7 @@ describe('ReservationsService', () => {
       mockPrismaService.service.findUnique.mockResolvedValue(mockServiceData);
       mockPrismaService.pet.findUnique.mockResolvedValue({
         ...mockPetData,
-        user: { user_id: 'test-user-id' },
+        user: { id: 'test-user-id' },
       });
       mockPrismaService.reservation.findFirst.mockResolvedValue(null);
       mockPrismaService.reservation.create.mockResolvedValue(
@@ -144,7 +166,7 @@ describe('ReservationsService', () => {
           notes: createReservationDto.notes,
         },
       });
-      expect(mockNotificationsService.create).toHaveBeenCalled();
+      expect(notificationsService.create).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException if service not found', async () => {
@@ -170,7 +192,7 @@ describe('ReservationsService', () => {
       mockPrismaService.pet.findUnique.mockResolvedValue({
         ...mockPetData,
         user_id: differentUserId,
-        user: { user_id: differentUserId },
+        user: { id: differentUserId },
       });
 
       await expect(
@@ -193,7 +215,7 @@ describe('ReservationsService', () => {
       mockPrismaService.service.findUnique.mockResolvedValue(mockServiceData);
       mockPrismaService.pet.findUnique.mockResolvedValue({
         ...mockPetData,
-        user: { user_id: 'test-user-id' },
+        user: { id: 'test-user-id' },
       });
 
       await expect(
@@ -205,7 +227,7 @@ describe('ReservationsService', () => {
       mockPrismaService.service.findUnique.mockResolvedValue(mockServiceData);
       mockPrismaService.pet.findUnique.mockResolvedValue({
         ...mockPetData,
-        user: { user_id: 'test-user-id' },
+        user: { id: 'test-user-id' },
       });
       mockPrismaService.reservation.findFirst.mockResolvedValue(
         mockReservationData,
@@ -229,12 +251,52 @@ describe('ReservationsService', () => {
       expect(result).toEqual(mockReservations);
       expect(mockPrismaService.reservation.findMany).toHaveBeenCalledWith({
         where: {
-          OR: [{ user_id: 'test-user-id' }, { business_id: 'test-user-id' }],
+          user_id: 'test-user-id',
           is_available: true,
         },
         include: {
           service: true,
           pet: true,
+          business: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              address: true,
+            },
+          },
+        },
+        orderBy: {
+          start_time: 'desc',
+        },
+      });
+    });
+
+    it('should handle onlyAvailable parameter correctly', async () => {
+      const mockReservations = [mockReservationData];
+      mockPrismaService.reservation.findMany.mockResolvedValue(
+        mockReservations,
+      );
+
+      const result = await service.findAll('test-user-id', false);
+
+      expect(result).toEqual(mockReservations);
+      expect(mockPrismaService.reservation.findMany).toHaveBeenCalledWith({
+        where: {
+          user_id: 'test-user-id',
+          is_available: undefined,
+        },
+        include: {
+          service: true,
+          pet: true,
+          business: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              address: true,
+            },
+          },
         },
         orderBy: {
           start_time: 'desc',
@@ -260,6 +322,14 @@ describe('ReservationsService', () => {
         include: {
           service: true,
           pet: true,
+          business: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              address: true,
+            },
+          },
         },
       });
     });
@@ -272,14 +342,15 @@ describe('ReservationsService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw BadRequestException if user does not have permission', async () => {
-      mockPrismaService.reservation.findUnique.mockResolvedValue(
-        mockReservationData,
-      );
+    it('should throw ForbiddenException if user does not have permission', async () => {
+      mockPrismaService.reservation.findUnique.mockResolvedValue({
+        ...mockReservationData,
+        user_id: 'different-user-id',
+      });
 
       await expect(
-        service.findOne('test-reservation-id', 'unauthorized-user-id'),
-      ).rejects.toThrow(BadRequestException);
+        service.findOne('test-reservation-id', 'test-user-id'),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -294,10 +365,21 @@ describe('ReservationsService', () => {
       mockPrismaService.reservation.findUnique.mockResolvedValue(
         mockReservationData,
       );
-      mockPrismaService.reservation.update.mockResolvedValue({
+
+      const updatedData = {
         ...mockReservationData,
-        ...updateReservationDto,
-      });
+        notes: updateReservationDto.notes,
+      };
+
+      if (updateReservationDto.start_time) {
+        updatedData.start_time = new Date(updateReservationDto.start_time);
+      }
+
+      if (updateReservationDto.end_time) {
+        updatedData.end_time = new Date(updateReservationDto.end_time);
+      }
+
+      mockPrismaService.reservation.update.mockResolvedValue(updatedData);
 
       const result = await service.update(
         'test-reservation-id',
@@ -305,23 +387,25 @@ describe('ReservationsService', () => {
         updateReservationDto,
       );
 
-      expect(result).toEqual({
-        ...mockReservationData,
-        ...updateReservationDto,
-      });
-      expect(mockPrismaService.reservation.update).toHaveBeenCalledWith({
-        where: { reservation_id: 'test-reservation-id' },
-        data: {
+      expect(result).toEqual(
+        expect.objectContaining({
+          notes: updateReservationDto.notes,
           start_time: expect.any(Date),
           end_time: expect.any(Date),
+        }),
+      );
+
+      expect(mockPrismaService.reservation.update).toHaveBeenCalledWith({
+        where: { reservation_id: 'test-reservation-id' },
+        data: expect.objectContaining({
           notes: updateReservationDto.notes,
-        },
+        }),
         include: {
           service: true,
           pet: true,
         },
       });
-      expect(mockNotificationsService.create).toHaveBeenCalled();
+      expect(notificationsService.create).toHaveBeenCalled();
     });
 
     it('should throw BadRequestException if reservation is not in PENDING status', async () => {
@@ -407,8 +491,10 @@ describe('ReservationsService', () => {
         where: { reservation_id: 'test-reservation-id' },
       });
 
-      // 타입 단언 사용
-      expect((result as { success: boolean }).success).toBe(true);
+      expect(result).toEqual({
+        success: true,
+        message: '차단 시간이 삭제되었습니다.',
+      });
     });
 
     it('should throw BadRequestException if reservation is not in PENDING status', async () => {
@@ -420,6 +506,57 @@ describe('ReservationsService', () => {
       await expect(
         service.cancel('test-reservation-id', 'test-user-id'),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('getUserPets', () => {
+    it('should return user pets', async () => {
+      const mockUser = {
+        id: 'test-user-id',
+        email: 'test@example.com',
+        name: '테스트 사용자',
+        pets: [mockPetData],
+      };
+
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+
+      const result = await service.getUserPets('test-user-id');
+      expect(result).toEqual(mockUser.pets);
+      expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 'test-user-id' },
+        include: { pets: true },
+      });
+    });
+
+    it('should throw NotFoundException if user not found', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.getUserPets('invalid-id')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('getAllServices', () => {
+    it('should return all services', async () => {
+      const mockServices = [
+        {
+          service_id: 'service-1',
+          name: '강아지 목욕',
+          description: '반려견 목욕 서비스입니다.',
+          price: 30000,
+          category: 'grooming',
+          admin: {
+            id: 'admin-1',
+            name: '펫샵 A',
+          },
+        },
+      ];
+
+      mockPrismaService.service.findMany.mockResolvedValue(mockServices);
+
+      const result = await service.getAllServices();
+      expect(result).toEqual(mockServices);
     });
   });
 });

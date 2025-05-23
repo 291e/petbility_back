@@ -17,6 +17,7 @@ export class BusinessScheduleService {
    * 사업자의 영업 일정을 관리합니다.
    * @param business_id 사업자 ID
    * @param dto 영업 일정 정보
+   * @throws {BadRequestException} 주간 일정이 없는 경우
    */
   async manageSchedule(business_id: string, dto: ManageAvailableTimeDto) {
     // 유효성 검사
@@ -87,6 +88,7 @@ export class BusinessScheduleService {
   /**
    * 사업자의 전체 영업 일정을 조회합니다.
    * @param business_id 사업자 ID
+   * @throws {NotFoundException} 일정을 찾을 수 없는 경우
    */
   async getSchedule(business_id: string) {
     // 데이터베이스에서 조회
@@ -118,6 +120,8 @@ export class BusinessScheduleService {
    * 특정 날짜의 예약 가능 시간을 조회합니다.
    * @param business_id 사업자 ID
    * @param date 날짜 (YYYY-MM-DD)
+   * @throws {BadRequestException} 날짜 형식이 올바르지 않은 경우
+   * @throws {NotFoundException} 일정을 찾을 수 없는 경우
    */
   async getAvailableTimeByDate(business_id: string, date: string) {
     // 날짜 형식 검증

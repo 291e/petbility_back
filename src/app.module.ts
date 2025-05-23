@@ -5,7 +5,7 @@ import { UserModule } from './user/user.module';
 import { BusinessModule } from './business/business.module';
 import { AdminModule } from './admin/admin.module';
 import { NotificationsModule } from './notifications/notifications.module';
-import { SupabaseModule } from './auth/supabase/supabase.module';
+import { AuthModule } from './auth/auth.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -17,7 +17,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     }),
     ScheduleModule.forRoot(),
     PrismaModule,
-    SupabaseModule,
+    AuthModule,
     UserModule,
     BusinessModule,
     AdminModule,

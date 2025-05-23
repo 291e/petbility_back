@@ -10,8 +10,8 @@ import { PrismaService } from 'prisma/prisma.service';
 import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto';
 import { Prisma, ReservationStatus, ServiceCategory } from '@prisma/client';
 import { format } from 'date-fns';
-import { NotificationsService } from '@/notifications/notifications.service';
-import { NotificationType } from '@/notifications/types/notification.type';
+import { NotificationsService } from '../../notifications/notifications.service';
+import { NotificationType } from '../../notifications/types/notification.type';
 
 @Injectable()
 export class BusinessReservationsService {
@@ -28,7 +28,7 @@ export class BusinessReservationsService {
       },
       include: {
         user: {
-          select: { user_id: true, name: true, phone: true, address: true },
+          select: { id: true, name: true, phone: true, address: true },
         },
         pet: true,
         service: true,

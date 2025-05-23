@@ -6,7 +6,7 @@ import {
   Delete,
   Body,
   Param,
-  Request,
+  Req,
   UseGuards,
   HttpStatus,
 } from '@nestjs/common';
@@ -15,13 +15,15 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiParam,
 } from '@nestjs/swagger';
 import { PetsService } from './pets.service';
-import { SupabaseAuthGuard } from '@/auth/supabase-auth.guard';
+import { AuthGuard } from '@/auth/auth.guard';
 import { CreatePetDto } from './dto/create-pet.dto';
 import { UpdatePetDto } from './dto/update-pet.dto';
+import { Request } from 'express';
 
-@ApiTags('pets')
+@ApiTags('반려동물')
 @Controller('pets')
 export class PetsController {
   constructor(private readonly petsService: PetsService) {}
@@ -36,11 +38,10 @@ export class PetsController {
     description: '잘못된 요청입니다.',
   })
   @ApiBearerAuth()
-  @UseGuards(SupabaseAuthGuard)
+  @UseGuards(AuthGuard)
   @Post()
-  async createPet(@Request() req, @Body() petData: CreatePetDto) {
-    const userId = req.user.user_id;
-    return this.petsService.createPet(userId, petData);
+  async createPet(@Req() req: Request, @Body() petData: CreatePetDto) {
+    return this.petsService.createPet(req.user.id, petData);
   }
 
   @ApiOperation({ summary: '사용자의 반려동물 목록 조회' })
@@ -49,11 +50,10 @@ export class PetsController {
     description: '반려동물 목록을 성공적으로 조회했습니다.',
   })
   @ApiBearerAuth()
-  @UseGuards(SupabaseAuthGuard)
+  @UseGuards(AuthGuard)
   @Get()
-  async getUserPets(@Request() req) {
-    const userId = req.user.user_id;
-    return this.petsService.getUserPets(userId);
+  async getUserPets(@Req() req: Request) {
+    return this.petsService.getUserPets(req.user.id);
   }
 
   @ApiOperation({ summary: '반려동물 상세 정보 조회' })
@@ -65,6 +65,7 @@ export class PetsController {
     status: HttpStatus.NOT_FOUND,
     description: '반려동물을 찾을 수 없습니다.',
   })
+  @ApiParam({ name: 'id', description: '반려동물 ID' })
   @Get(':id')
   async getPetById(@Param('id') petId: string) {
     return this.petsService.getPetById(petId);
@@ -79,16 +80,16 @@ export class PetsController {
     status: HttpStatus.NOT_FOUND,
     description: '반려동물을 찾을 수 없거나 수정 권한이 없습니다.',
   })
+  @ApiParam({ name: 'id', description: '반려동물 ID' })
   @ApiBearerAuth()
-  @UseGuards(SupabaseAuthGuard)
+  @UseGuards(AuthGuard)
   @Patch(':id')
   async updatePet(
-    @Request() req,
+    @Req() req: Request,
     @Param('id') petId: string,
     @Body() petData: UpdatePetDto,
   ) {
-    const userId = req.user.user_id;
-    return this.petsService.updatePet(petId, petData, userId);
+    return this.petsService.updatePet(petId, petData, req.user.id);
   }
 
   @ApiOperation({ summary: '반려동물 삭제' })
@@ -100,11 +101,11 @@ export class PetsController {
     status: HttpStatus.NOT_FOUND,
     description: '반려동물을 찾을 수 없거나 삭제 권한이 없습니다.',
   })
+  @ApiParam({ name: 'id', description: '반려동물 ID' })
   @ApiBearerAuth()
-  @UseGuards(SupabaseAuthGuard)
+  @UseGuards(AuthGuard)
   @Delete(':id')
-  async deletePet(@Request() req, @Param('id') petId: string) {
-    const userId = req.user.user_id;
-    return this.petsService.deletePet(petId, userId);
+  async deletePet(@Req() req: Request, @Param('id') petId: string) {
+    return this.petsService.deletePet(petId, req.user.id);
   }
 }

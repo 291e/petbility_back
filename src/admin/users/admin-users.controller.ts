@@ -9,13 +9,13 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { SupabaseAuthGuard } from '@/auth/supabase-auth.guard';
+import { AuthGuard } from '@/auth/auth.guard';
 import { Roles } from '@/auth/decorators/roles.decorator';
 import { RolesGuard } from '@/auth/roles.guard';
 import { AdminUsersService } from './admin-users.service';
 
 @Controller('admin/users')
-@UseGuards(SupabaseAuthGuard, RolesGuard)
+@UseGuards(AuthGuard, RolesGuard)
 @Roles('ADMIN')
 export class AdminUsersController {
   constructor(private readonly usersService: AdminUsersService) {}

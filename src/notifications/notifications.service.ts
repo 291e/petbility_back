@@ -74,7 +74,7 @@ export class NotificationsService {
   async create(userId: string, data: NotificationData) {
     // 사용자 정보 조회
     const user = await this.prisma.user.findUnique({
-      where: { user_id: userId },
+      where: { id: userId },
     });
 
     if (!user) {

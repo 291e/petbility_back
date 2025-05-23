@@ -6,9 +6,27 @@ import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { ReservationStatus } from '@prisma/client';
 import { Request } from 'express';
 import { addHours } from 'date-fns';
-import { SupabaseAuthGuard } from '@/auth/supabase-auth.guard';
-import { SupabaseService } from '@/auth/supabase/supabase.service';
+import { AuthGuard } from '@/auth/auth.guard';
 import { PrismaService } from 'prisma/prisma.service';
+import { NotificationsService } from '@/notifications/notifications.service';
+
+// NotificationsService 모킹
+jest.mock('@/notifications/notifications.service', () => {
+  return {
+    NotificationsService: jest.fn().mockImplementation(() => {
+      return {
+        create: jest.fn().mockResolvedValue({}),
+      };
+    }),
+  };
+});
+
+// Request 타입의 모의 객체를 생성하는 헬퍼 함수
+function createMockRequest(user: any): Request {
+  return {
+    user,
+  } as Request;
+}
 
 describe('ReservationsController', () => {
   let controller: ReservationsController;
@@ -36,14 +54,20 @@ describe('ReservationsController', () => {
     findOne: jest.fn(),
     update: jest.fn(),
     cancel: jest.fn(),
-  };
-
-  const mockSupabaseService = {
-    getClient: jest.fn(),
+    getAllServices: jest.fn(),
+    getBusinessesByService: jest.fn(),
+    getAvailableSchedule: jest.fn(),
+    getDisabledDates: jest.fn(),
+    getAvailableTimesByDate: jest.fn(),
+    getUserPets: jest.fn(),
   };
 
   const mockPrismaService = {
     user: {
+      findUnique: jest.fn(),
+    },
+    reservation: {
+      findMany: jest.fn(),
       findUnique: jest.fn(),
     },
   };
@@ -57,21 +81,20 @@ describe('ReservationsController', () => {
           useValue: mockReservationsService,
         },
         {
-          provide: SupabaseService,
-          useValue: mockSupabaseService,
-        },
-        {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
         {
-          provide: SupabaseAuthGuard,
-          useValue: {
-            canActivate: jest.fn().mockReturnValue(true),
-          },
+          provide: NotificationsService,
+          useFactory: () => ({
+            create: jest.fn().mockResolvedValue({}),
+          }),
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(AuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<ReservationsController>(ReservationsController);
     service = module.get<ReservationsService>(ReservationsService);
@@ -90,9 +113,7 @@ describe('ReservationsController', () => {
       notes: '테스트 예약입니다.',
     };
 
-    const mockRequest = {
-      user: { user_id: 'test-user-id' },
-    } as Request;
+    const mockRequest = createMockRequest({ id: 'test-user-id' });
 
     it('should create a reservation', async () => {
       mockReservationsService.create.mockResolvedValue(mockReservationData);
@@ -108,9 +129,7 @@ describe('ReservationsController', () => {
   });
 
   describe('findAll', () => {
-    const mockRequest = {
-      user: { user_id: 'test-user-id' },
-    } as Request;
+    const mockRequest = createMockRequest({ id: 'test-user-id' });
 
     it('should return an array of reservations', async () => {
       const mockReservations = [mockReservationData];
@@ -126,9 +145,7 @@ describe('ReservationsController', () => {
   });
 
   describe('findOne', () => {
-    const mockRequest = {
-      user: { user_id: 'test-user-id' },
-    } as Request;
+    const mockRequest = createMockRequest({ id: 'test-user-id' });
 
     it('should return a reservation by id', async () => {
       mockReservationsService.findOne.mockResolvedValue(mockReservationData);
@@ -153,17 +170,21 @@ describe('ReservationsController', () => {
       notes: '수정된 테스트 예약입니다.',
     };
 
-    const mockRequest = {
-      user: { user_id: 'test-user-id' },
-    } as Request;
+    const mockRequest = createMockRequest({ id: 'test-user-id' });
 
     it('should update a reservation', async () => {
-      mockReservationsService.update.mockResolvedValue({
+      const updatedReservation = {
         ...mockReservationData,
-        ...updateReservationDto,
-        start_time: addHours(new Date(), 26),
-        end_time: addHours(new Date(), 27),
-      });
+        notes: updateReservationDto.notes,
+        start_time: updateReservationDto.start_time
+          ? new Date(updateReservationDto.start_time)
+          : mockReservationData.start_time,
+        end_time: updateReservationDto.end_time
+          ? new Date(updateReservationDto.end_time)
+          : mockReservationData.end_time,
+      };
+
+      mockReservationsService.update.mockResolvedValue(updatedReservation);
 
       const result = await controller.update(
         'test-reservation-id',
@@ -171,12 +192,7 @@ describe('ReservationsController', () => {
         mockRequest,
       );
 
-      expect(result).toEqual({
-        ...mockReservationData,
-        ...updateReservationDto,
-        start_time: expect.any(Date),
-        end_time: expect.any(Date),
-      });
+      expect(result).toEqual(updatedReservation);
       expect(mockReservationsService.update).toHaveBeenCalledWith(
         'test-reservation-id',
         'test-user-id',
@@ -186,9 +202,7 @@ describe('ReservationsController', () => {
   });
 
   describe('cancel', () => {
-    const mockRequest = {
-      user: { user_id: 'test-user-id' },
-    } as Request;
+    const mockRequest = createMockRequest({ id: 'test-user-id' });
 
     it('should cancel a reservation', async () => {
       const canceledReservation = {
@@ -219,10 +233,82 @@ describe('ReservationsController', () => {
       const result = await controller.cancel('blocked-time-id', mockRequest);
 
       expect(result).toEqual(successResponse);
-      expect((result as { success: boolean }).success).toBe(true);
       expect(mockReservationsService.cancel).toHaveBeenCalledWith(
         'blocked-time-id',
         'test-user-id',
+      );
+    });
+  });
+
+  describe('getAllServices', () => {
+    it('should return all services', async () => {
+      const mockServices = [
+        {
+          service_id: 'service-1',
+          name: '강아지 목욕',
+          description: '반려견 목욕 서비스입니다.',
+          price: 30000,
+          category: 'grooming',
+          admin: {
+            id: 'admin-1',
+            name: '펫샵 A',
+          },
+        },
+      ];
+
+      mockReservationsService.getAllServices.mockResolvedValue(mockServices);
+
+      const result = await controller.getAllServices();
+      expect(result).toEqual(mockServices);
+      expect(mockReservationsService.getAllServices).toHaveBeenCalled();
+    });
+  });
+
+  describe('getUserPets', () => {
+    const mockRequest = createMockRequest({ id: 'test-user-id' });
+
+    it('should return user pets', async () => {
+      const mockPets = [
+        {
+          pet_id: 'pet-1',
+          name: '멍멍이',
+          breed: '말티즈',
+          user_id: 'test-user-id',
+        },
+      ];
+
+      mockReservationsService.getUserPets.mockResolvedValue(mockPets);
+
+      const result = await controller.getUserPets(mockRequest);
+      expect(result).toEqual(mockPets);
+      expect(mockReservationsService.getUserPets).toHaveBeenCalledWith(
+        'test-user-id',
+      );
+    });
+  });
+
+  describe('getAvailableSchedule', () => {
+    it('should return available schedule', async () => {
+      const mockSchedule = {
+        date: '2023-01-01',
+        available_time_slots: ['10:00', '10:30', '11:00'],
+      };
+
+      mockReservationsService.getAvailableSchedule.mockResolvedValue(
+        mockSchedule,
+      );
+
+      const result = await controller.getAvailableSchedule(
+        'business-1',
+        'service-1',
+        '2023-01-01',
+      );
+
+      expect(result).toEqual(mockSchedule);
+      expect(mockReservationsService.getAvailableSchedule).toHaveBeenCalledWith(
+        'business-1',
+        'service-1',
+        '2023-01-01',
       );
     });
   });

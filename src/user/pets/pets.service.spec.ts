@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PetsService } from './pets.service';
 import { PrismaService } from 'prisma/prisma.service';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { CreatePetDto, PetGender } from './dto/create-pet.dto';
 import { UpdatePetDto } from './dto/update-pet.dto';
 import { Prisma } from '@prisma/client';
@@ -37,6 +37,7 @@ describe('PetsService', () => {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
+        Logger,
       ],
     }).compile();
 
@@ -55,12 +56,14 @@ describe('PetsService', () => {
       species: '강아지',
       breed: '말티즈',
       gender: PetGender.MALE,
+      weight: 5.5,
+      profileImageUrl: 'https://example.com/pet.jpg',
       note: '알러지가 있음',
     };
 
     it('should create a pet successfully', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue({
-        user_id: mockUserId,
+        id: mockUserId,
       });
       mockPrismaService.pet.create.mockResolvedValue({
         ...mockPetData,
@@ -76,11 +79,17 @@ describe('PetsService', () => {
         data: {
           ...mockPetData,
           user: {
-            connect: { user_id: mockUserId },
+            connect: { id: mockUserId },
           },
         },
         include: {
-          user: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
         },
       });
     });
@@ -96,7 +105,7 @@ describe('PetsService', () => {
 
     it('should handle Prisma errors', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue({
-        user_id: mockUserId,
+        id: mockUserId,
       });
       mockPrismaService.pet.create.mockRejectedValue(
         new Prisma.PrismaClientKnownRequestError('Error', {
@@ -118,17 +127,21 @@ describe('PetsService', () => {
         pet_id: 'pet-1',
         name: '멍멍이',
         user_id: mockUserId,
+        weight: 5.5,
+        profileImageUrl: 'https://example.com/pet1.jpg',
       },
       {
         pet_id: 'pet-2',
         name: '냥냥이',
         user_id: mockUserId,
+        weight: 4.0,
+        profileImageUrl: 'https://example.com/pet2.jpg',
       },
     ];
 
     it('should return user pets', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue({
-        user_id: mockUserId,
+        id: mockUserId,
       });
       mockPrismaService.pet.findMany.mockResolvedValue(mockPets);
 
@@ -138,9 +151,15 @@ describe('PetsService', () => {
       expect(mockPrismaService.pet.findMany).toHaveBeenCalledWith({
         where: { user_id: mockUserId },
         include: {
-          user: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
         },
-        orderBy: { pet_id: 'desc' },
+        orderBy: { created_at: 'desc' },
       });
     });
 
@@ -160,6 +179,8 @@ describe('PetsService', () => {
       pet_id: mockPetId,
       name: '멍멍이',
       user_id: 'test-user-id',
+      weight: 5.5,
+      profileImageUrl: 'https://example.com/pet.jpg',
     };
 
     it('should return pet by id', async () => {
@@ -171,7 +192,13 @@ describe('PetsService', () => {
       expect(mockPrismaService.pet.findUnique).toHaveBeenCalledWith({
         where: { pet_id: mockPetId },
         include: {
-          user: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
         },
       });
     });
@@ -190,6 +217,8 @@ describe('PetsService', () => {
     const mockUserId = 'test-user-id';
     const mockUpdateData: UpdatePetDto = {
       name: '멍멍이2',
+      weight: 6.0,
+      profileImageUrl: 'https://example.com/updated-pet.jpg',
       note: '업데이트된 특이사항',
     };
 
@@ -210,11 +239,22 @@ describe('PetsService', () => {
       );
 
       expect(result).toHaveProperty('pet_id', mockPetId);
+      expect(result).toHaveProperty('weight', mockUpdateData.weight);
+      expect(result).toHaveProperty(
+        'profileImageUrl',
+        mockUpdateData.profileImageUrl,
+      );
       expect(mockPrismaService.pet.update).toHaveBeenCalledWith({
         where: { pet_id: mockPetId },
         data: mockUpdateData,
         include: {
-          user: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
         },
       });
     });

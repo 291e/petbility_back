@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { TossPaymentsError } from './toss-payments.error';
 import { ApprovePaymentDto } from '@/user/payments/dto/approve-payment.dto';
 import { lastValueFrom } from 'rxjs';
+import axios from 'axios';
 
 /**
  * 토스페이먼츠 연동 서비스
@@ -11,24 +12,18 @@ import { lastValueFrom } from 'rxjs';
 @Injectable()
 export class TossPaymentsService {
   private readonly logger = new Logger(TossPaymentsService.name);
-  private readonly tossPaymentsApiKey: string;
-  private readonly tossPaymentsApiUrl: string =
-    'https://api.tosspayments.com/v1';
+  private readonly tossSecretKey: string;
+  private readonly tossPaymentsUrl = 'https://api.tosspayments.com/v1/payments';
 
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {
-    this.tossPaymentsApiKey =
-      this.configService.get<string>('TOSS_SECRET_KEY') || '';
-  }
-
-  /**
-   * Basic Auth 헤더 생성
-   * 시크릿 키 뒤에 ':' 추가 후 base64 인코딩
-   */
-  private getBasicAuthHeader(): string {
-    return `Basic ${Buffer.from(`${this.tossPaymentsApiKey}:`).toString('base64')}`;
+    const secretKey = this.configService.get<string>('TOSS_SECRET_KEY');
+    if (!secretKey) {
+      throw new Error('TOSS_SECRET_KEY is not defined');
+    }
+    this.tossSecretKey = secretKey;
   }
 
   /**
@@ -101,31 +96,29 @@ export class TossPaymentsService {
         `토스페이먼츠 API 요청 데이터: ${JSON.stringify(requestData)}`,
       );
       this.logger.log(
-        `토스페이먼츠 API 요청 URL: ${this.tossPaymentsApiUrl}/payments/${paymentKey}`,
-      );
-      this.logger.log(
-        `토스페이먼츠 API 키: ${this.tossPaymentsApiKey ? '설정됨' : '설정되지 않음'}`,
+        `토스페이먼츠 API 요청 URL: ${this.tossPaymentsUrl}/${paymentKey}`,
       );
 
       // API 키 확인
-      if (!this.tossPaymentsApiKey) {
+      if (!this.tossSecretKey) {
         throw new TossPaymentsError(
           '토스페이먼츠 API 키가 설정되지 않았습니다.',
           'API_KEY_NOT_SET',
         );
       }
 
-      const response = await lastValueFrom(
-        this.httpService.post(
-          `${this.tossPaymentsApiUrl}/payments/${paymentKey}`,
-          requestData,
-          {
-            headers: {
-              Authorization: this.getBasicAuthHeader(),
-              'Content-Type': 'application/json',
-            },
+      const authHeader = `Basic ${Buffer.from(this.tossSecretKey + ':').toString('base64')}`;
+      this.logger.log(`Authorization 헤더: ${authHeader}`);
+
+      const response = await axios.post(
+        `${this.tossPaymentsUrl}/${paymentKey}`,
+        requestData,
+        {
+          headers: {
+            Authorization: authHeader,
+            'Content-Type': 'application/json',
           },
-        ),
+        },
       );
 
       this.logger.log(`토스페이먼츠 결제 승인 성공: ${orderId}`);
@@ -155,10 +148,10 @@ export class TossPaymentsService {
         this.logger.error(`토스페이먼츠 API 에러: ${error.message}`);
       }
 
-      if (error.response && error.response.data) {
+      if (error.response?.data) {
         throw new TossPaymentsError(
           error.response.data.message || '결제 승인 중 오류가 발생했습니다.',
-          error.response.data.code,
+          error.response.data.code || 'UNKNOWN_ERROR',
         );
       }
 
@@ -181,19 +174,17 @@ export class TossPaymentsService {
         `토스페이먼츠 결제 취소 요청: ${paymentKey}, ${cancelReason}`,
       );
 
-      const response = await lastValueFrom(
-        this.httpService.post(
-          `${this.tossPaymentsApiUrl}/payments/${paymentKey}/cancel`,
-          {
-            cancelReason,
+      const response = await axios.post(
+        `${this.tossPaymentsUrl}/${paymentKey}/cancel`,
+        {
+          cancelReason,
+        },
+        {
+          headers: {
+            Authorization: `Basic ${Buffer.from(this.tossSecretKey + ':').toString('base64')}`,
+            'Content-Type': 'application/json',
           },
-          {
-            headers: {
-              Authorization: this.getBasicAuthHeader(),
-              'Content-Type': 'application/json',
-            },
-          },
-        ),
+        },
       );
 
       this.logger.log(`토스페이먼츠 결제 취소 성공: ${paymentKey}`);
@@ -225,15 +216,12 @@ export class TossPaymentsService {
       this.logger.log(`토스페이먼츠 결제 정보 조회 요청: ${paymentKey}`);
 
       const response = await lastValueFrom(
-        this.httpService.get(
-          `${this.tossPaymentsApiUrl}/payments/${paymentKey}`,
-          {
-            headers: {
-              Authorization: this.getBasicAuthHeader(),
-              'Content-Type': 'application/json',
-            },
+        this.httpService.get(`${this.tossPaymentsUrl}/${paymentKey}`, {
+          headers: {
+            Authorization: `Basic ${Buffer.from(this.tossSecretKey + ':').toString('base64')}`,
+            'Content-Type': 'application/json',
           },
-        ),
+        }),
       );
 
       this.logger.log(`토스페이먼츠 결제 정보 조회 성공: ${paymentKey}`);

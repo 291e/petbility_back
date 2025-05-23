@@ -10,9 +10,9 @@ import {
 } from '@nestjs/common';
 import { BusinessScheduleService } from './business-schedule.service';
 import { ManageAvailableTimeDto } from './dto/manage-available-time.dto';
-import { SupabaseAuthGuard } from '@/auth/supabase-auth.guard';
-import { RolesGuard } from '@/auth/roles.guard';
-import { Roles } from '@/auth/decorators/roles.decorator';
+import { AuthGuard } from '../../auth/auth.guard';
+import { RolesGuard } from '../../auth/roles.guard';
+import { Roles } from '../../auth/decorators/roles.decorator';
 import {
   ApiTags,
   ApiOperation,
@@ -22,15 +22,25 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 
+/**
+ * 비즈니스 일정 관리 컨트롤러
+ * 영업 시간, 휴무일, 휴식 시간 등의 일정을 관리합니다.
+ */
 @ApiTags('Business Schedule')
 @Controller('business/schedule')
-@UseGuards(SupabaseAuthGuard, RolesGuard)
+@UseGuards(AuthGuard, RolesGuard)
 @Roles('BUSINESS')
 export class BusinessScheduleController {
   constructor(
     private readonly businessScheduleService: BusinessScheduleService,
   ) {}
 
+  /**
+   * 비즈니스 영업 일정을 설정합니다.
+   * @param business_id 비즈니스 ID
+   * @param dto 영업 일정 정보
+   * @returns 설정 결과 메시지
+   */
   @ApiOperation({
     summary: '비즈니스 영업 일정 관리',
     description:
@@ -47,6 +57,11 @@ export class BusinessScheduleController {
     return this.businessScheduleService.manageSchedule(business_id, dto);
   }
 
+  /**
+   * 비즈니스 영업 일정을 조회합니다.
+   * @param business_id 비즈니스 ID
+   * @returns 영업 일정 정보
+   */
   @ApiOperation({
     summary: '비즈니스 영업 일정 조회',
     description:
@@ -109,6 +124,12 @@ export class BusinessScheduleController {
     return this.businessScheduleService.getSchedule(business_id);
   }
 
+  /**
+   * 특정 날짜의 예약 가능 시간을 조회합니다.
+   * @param business_id 비즈니스 ID
+   * @param date 조회할 날짜 (YYYY-MM-DD 형식)
+   * @returns 예약 가능 시간 슬롯
+   */
   @ApiOperation({
     summary: '특정 날짜의 예약 가능 시간 조회',
     description:
@@ -166,6 +187,10 @@ export class BusinessScheduleController {
                 type: 'string',
                 nullable: true,
                 description: '예외 사유 (휴식 시간, 특별 휴무 등)',
+              },
+              type: {
+                type: 'string',
+                description: '예외 타입 (BREAK, HOLIDAY 등)',
               },
             },
           },

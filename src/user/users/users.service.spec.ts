@@ -1,11 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
 import { PrismaService } from 'prisma/prisma.service';
-import { SupabaseService } from '@/auth/supabase/supabase.service';
 import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  ConflictException,
 } from '@nestjs/common';
 import { UserRole } from './dto/create-user.dto';
 import { Prisma } from '@prisma/client';
@@ -13,7 +13,6 @@ import { Prisma } from '@prisma/client';
 describe('UsersService', () => {
   let service: UsersService;
   let prismaService: PrismaService;
-  let supabaseService: SupabaseService;
 
   const mockPrismaService = {
     user: {
@@ -34,10 +33,6 @@ describe('UsersService', () => {
     },
   };
 
-  const mockSupabaseService = {
-    getUserByToken: jest.fn(),
-  };
-
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -46,16 +41,11 @@ describe('UsersService', () => {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
-        {
-          provide: SupabaseService,
-          useValue: mockSupabaseService,
-        },
       ],
     }).compile();
 
     service = module.get<UsersService>(UsersService);
     prismaService = module.get<PrismaService>(PrismaService);
-    supabaseService = module.get<SupabaseService>(SupabaseService);
   });
 
   afterEach(() => {
@@ -64,11 +54,10 @@ describe('UsersService', () => {
 
   describe('signUp', () => {
     const mockUserData = {
-      user_id: 'test-user-id',
       email: 'test@example.com',
       name: 'Test User',
       phone: '01012345678',
-      profile_image: 'profile.jpg',
+      profileImage: 'profile.jpg',
       address: 'Test Address',
       role: UserRole.USER,
       latitude: 37.5665,
@@ -82,38 +71,12 @@ describe('UsersService', () => {
       const result = await service.signUp(mockUserData);
 
       expect(result).toEqual(mockUserData);
-      expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
-        where: { user_id: mockUserData.user_id },
-      });
       expect(mockPrismaService.user.create).toHaveBeenCalledWith({
-        data: {
-          user_id: mockUserData.user_id,
-          email: mockUserData.email,
-          name: mockUserData.name,
-          phone: mockUserData.phone,
-          profileImage: mockUserData.profile_image,
-          address: mockUserData.address,
-          role: mockUserData.role,
-          latitude: mockUserData.latitude,
-          longitude: mockUserData.longitude,
-        },
-        include: {
-          pets: true,
-          services: true,
-        },
+        data: mockUserData,
       });
     });
 
-    it('should throw BadRequestException if user already exists', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(mockUserData);
-
-      await expect(service.signUp(mockUserData)).rejects.toThrow(
-        BadRequestException,
-      );
-      expect(mockPrismaService.user.create).not.toHaveBeenCalled();
-    });
-
-    it('should handle Prisma unique constraint error', async () => {
+    it('should throw ConflictException if email already exists', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue(null);
       const prismaError = new Prisma.PrismaClientKnownRequestError(
         'Unique constraint failed',
@@ -125,15 +88,15 @@ describe('UsersService', () => {
       mockPrismaService.user.create.mockRejectedValue(prismaError);
 
       await expect(service.signUp(mockUserData)).rejects.toThrow(
-        BadRequestException,
+        ConflictException,
       );
     });
   });
 
-  describe('getUserById', () => {
+  describe('findById', () => {
     const mockUserId = 'test-user-id';
     const mockUser = {
-      user_id: mockUserId,
+      id: mockUserId,
       email: 'test@example.com',
       name: 'Test User',
       pets: [],
@@ -144,11 +107,11 @@ describe('UsersService', () => {
     it('should return user by id', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
 
-      const result = await service.getUserById(mockUserId);
+      const result = await service.findById(mockUserId);
 
       expect(result).toEqual(mockUser);
       expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
-        where: { user_id: mockUserId },
+        where: { id: mockUserId },
         include: {
           pets: true,
           services: true,
@@ -165,7 +128,7 @@ describe('UsersService', () => {
     it('should throw NotFoundException if user not found', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue(null);
 
-      await expect(service.getUserById(mockUserId)).rejects.toThrow(
+      await expect(service.findById(mockUserId)).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -178,7 +141,7 @@ describe('UsersService', () => {
       email: 'updated@example.com',
     };
     const mockExistingUser = {
-      user_id: mockUserId,
+      id: mockUserId,
       email: 'test@example.com',
     };
 
@@ -197,7 +160,7 @@ describe('UsersService', () => {
         ...mockUpdateData,
       });
       expect(mockPrismaService.user.update).toHaveBeenCalledWith({
-        where: { user_id: mockUserId },
+        where: { id: mockUserId },
         data: mockUpdateData,
         include: {
           pets: true,
@@ -217,7 +180,7 @@ describe('UsersService', () => {
 
     it('should throw BadRequestException if email is already in use', async () => {
       const anotherUser = {
-        user_id: 'another-user-id',
+        id: 'another-user-id',
         email: mockUpdateData.email,
       };
 
@@ -234,7 +197,7 @@ describe('UsersService', () => {
   describe('deleteUser', () => {
     const mockUserId = 'test-user-id';
     const mockUser = {
-      user_id: mockUserId,
+      id: mockUserId,
       role: UserRole.USER,
       pets: [],
       services: [],
@@ -278,7 +241,7 @@ describe('UsersService', () => {
   describe('upgradeToBusiness', () => {
     const mockUserId = 'test-user-id';
     const mockUser = {
-      user_id: mockUserId,
+      id: mockUserId,
       role: UserRole.USER,
     };
 
@@ -293,7 +256,7 @@ describe('UsersService', () => {
 
       expect(result.role).toBe(UserRole.BUSINESS);
       expect(mockPrismaService.user.update).toHaveBeenCalledWith({
-        where: { user_id: mockUserId },
+        where: { id: mockUserId },
         data: { role: UserRole.BUSINESS },
         include: {
           pets: true,
@@ -329,8 +292,8 @@ describe('UsersService', () => {
     const mockPage = 1;
     const mockLimit = 10;
     const mockUsers = [
-      { user_id: 'user1', name: 'Test User 1' },
-      { user_id: 'user2', name: 'Test User 2' },
+      { id: 'user1', name: 'Test User 1' },
+      { id: 'user2', name: 'Test User 2' },
     ];
     const mockTotal = 2;
 

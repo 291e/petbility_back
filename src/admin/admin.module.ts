@@ -4,12 +4,12 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from 'prisma/prisma.module';
 import { AdminUsersController } from './users/admin-users.controller';
 import { AdminUsersService } from './users/admin-users.service';
-import { SupabaseModule } from '@/auth/supabase/supabase.module';
+import { AuthModule } from '@/auth/auth.module';
 import { AdminServicesController } from './services/admin-services.controller';
 import { AdminServicesService } from './services/admin-services.service';
 
 @Module({
-  imports: [PrismaModule, SupabaseModule],
+  imports: [PrismaModule, AuthModule],
   controllers: [AdminUsersController, AdminServicesController],
   providers: [AdminUsersService, AdminServicesService],
 })

@@ -3,6 +3,7 @@ import { BusinessScheduleService } from './business-schedule.service';
 import { PrismaService } from 'prisma/prisma.service';
 import { ManageAvailableTimeDto } from './dto/manage-available-time.dto';
 import { ScheduleType } from '@prisma/client';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 // 모킹 데이터
 const mockScheduleData = {
@@ -111,6 +112,14 @@ describe('BusinessScheduleService', () => {
         message: '영업 일정이 성공적으로 설정되었습니다.',
       });
     });
+
+    it('should throw BadRequestException when schedule is missing', async () => {
+      const dto = {} as ManageAvailableTimeDto;
+
+      await expect(service.manageSchedule('business1', dto)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
   });
 
   describe('getSchedule', () => {
@@ -138,6 +147,16 @@ describe('BusinessScheduleService', () => {
         business_id: 'business1',
         schedule: mockScheduleData,
       });
+    });
+
+    it('should throw NotFoundException when schedule is not found', async () => {
+      // 모킹
+      mockPrismaService.businessSchedule.findFirst.mockResolvedValue(null);
+
+      // 테스트 및 검증
+      await expect(service.getSchedule('business1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -196,6 +215,49 @@ describe('BusinessScheduleService', () => {
         },
         exception_schedule: [],
       });
+    });
+
+    it('should throw BadRequestException for invalid date format', async () => {
+      await expect(
+        service.getAvailableTimeByDate('business1', 'invalid-date'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw NotFoundException when schedule is not found', async () => {
+      // 모킹
+      mockPrismaService.businessSchedule.findFirst.mockResolvedValue(null);
+
+      // 테스트 및 검증
+      await expect(
+        service.getAvailableTimeByDate('business1', '2023-05-01'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should handle reservations correctly', async () => {
+      // 모킹 - 월요일 데이터 조회
+      mockPrismaService.businessSchedule.findFirst.mockResolvedValue({
+        id: 'schedule1',
+        business_id: 'business1',
+        schedule_data: mockScheduleData,
+      });
+
+      // 예약 데이터 모킹 (09:00~10:00 KST)
+      mockPrismaService.reservation.findMany.mockResolvedValue([
+        {
+          start_time: new Date('2023-05-01T00:00:00Z'), // 09:00 KST
+          end_time: new Date('2023-05-01T01:00:00Z'), // 10:00 KST
+        },
+      ]);
+
+      // 테스트
+      const result = await service.getAvailableTimeByDate(
+        'business1',
+        '2023-05-01',
+      );
+
+      // 검증 (09:00, 09:30은 차단되어야 함)
+      expect(result.available_time_slots).not.toContain('09:00');
+      expect(result.available_time_slots).not.toContain('09:30');
     });
   });
 });

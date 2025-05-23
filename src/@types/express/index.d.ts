@@ -1,15 +1,18 @@
 // src/@types/express/index.d.ts
-import { User } from '@supabase/supabase-js'; // 실제 user 타입 import 필요
+import { User } from '@prisma/client';
 
 declare global {
   namespace Express {
     interface Request {
       user: User & {
-        user_id: string;
+        id: string;
         email: string;
-        role: string;
         name: string;
-        phone?: string;
+        phone?: string | null;
+        profileImage?: string | null;
+        address?: string | null;
+        role: string;
+        createdAt: Date;
         latitude?: number | null;
         longitude?: number | null;
       };

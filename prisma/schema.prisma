@@ -8,26 +8,72 @@ datasource db {
 }
 
 model User {
-  user_id               String                  @id @default(uuid()) @db.Uuid
-  email                 String                  @unique
-  name                  String
-  phone                 String?
-  profileImage          String?
-  address               String?
-  role                  String
-  createdAt             DateTime                @default(now())
-  latitude              Float?
-  longitude             Float?
-  pets                  Pet[]
-  notifications         Notification[]          @relation("UserNotifications")
-  businessReservations  Reservation[]           @relation("BusinessReservations")
-  reservations          Reservation[]           @relation("UserReservations")
-  services              Service[]               @relation("UserServices")
-  businessSchedules     BusinessSchedule[]      @relation("BusinessSchedules")
-  businessServices      BusinessService[]       @relation("BusinessToServices")
-  payments              Payment[]               @relation("UserPayments")
-  businessPayments      Payment[]               @relation("BusinessPayments")
+  id                  String             @id @default(uuid()) @db.Uuid
+  email               String?            @unique
+  emailVerified       DateTime?
+  name                String?
+  phone               String?
+  image               String?
+  address             String?
+  password            String?
+  role                String             @default("USER")
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  deletedAt           DateTime?
+  latitude            Float?
+  longitude           Float?
+  pets                Pet[]
+  businessSchedules   BusinessSchedule[] @relation("BusinessSchedules")
+  businessServices    BusinessService[]  @relation("BusinessToServices")
+  notifications       Notification[]     @relation("UserNotifications")
+  businessReservations Reservation[]     @relation("BusinessReservations")
+  reservations        Reservation[]      @relation("UserReservations")
+  services            Service[]          @relation("UserServices")
+  accounts            Account[]
+  sessions            Session[]
+  payments            Payment[]
+  businessPayments    Payment[]          @relation("BusinessPayments")
+
+  @@map("users")
 }
+
+model Account {
+  id                String  @id @default(cuid())
+   userId       String   @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+   userId       String   @db.Uuid
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
 
 model Pet {
   pet_id       String        @id @default(uuid()) @db.Uuid
@@ -40,46 +86,47 @@ model Pet {
   photo        String?
   created_at   DateTime      @default(now())
   updated_at   DateTime      @updatedAt
-  user         User          @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  user         User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
   reservations Reservation[]
 }
 
 model Service {
-  service_id            String                  @id @default(uuid()) @db.Uuid
-  name                  String
-  description           String
-  price                 Decimal
-  category              ServiceCategory
-  created_at            DateTime                @default(now())
-  updated_at            DateTime                @updatedAt
-  admin_id              String                  @db.Uuid
-  reservations          Reservation[]
-  admin                 User                    @relation("UserServices", fields: [admin_id], references: [user_id])
-  businessServices      BusinessService[]       @relation("ServiceToBusinesses")
-  payments              Payment[]
+  service_id       String            @id @default(uuid()) @db.Uuid
+  name             String
+  description      String
+  price            Decimal
+  category         ServiceCategory
+  created_at       DateTime          @default(now())
+  updated_at       DateTime          @updatedAt
+  admin_id         String            @db.Uuid
+  businessServices BusinessService[] @relation("ServiceToBusinesses")
+  reservations     Reservation[]
+  payments         Payment[]
+  admin            User              @relation("UserServices", fields: [admin_id], references: [id])
 
   @@map("services")
 }
 
 model Reservation {
   reservation_id String            @id @default(uuid()) @db.Uuid
-  user_id       String            @db.Uuid
-  service_id    String?           @db.Uuid
-  business_id   String            @db.Uuid
-  pet_id        String?           @db.Uuid
-  status        ReservationStatus
-  notes         String?
-  created_at    DateTime          @default(now())
-  updated_at    DateTime          @updatedAt
-  price         Decimal           @default(0)
-  start_time    DateTime
-  end_time      DateTime?         // 선택적 필드로 변경
-  is_available  Boolean           @default(true)  // 예약 가능 여부
-  business      User              @relation("BusinessReservations", fields: [business_id], references: [user_id], onDelete: Cascade)
-  pet           Pet?              @relation(fields: [pet_id], references: [pet_id], onDelete: Cascade)
-  service       Service?          @relation(fields: [service_id], references: [service_id], onDelete: Cascade)
-  user          User              @relation("UserReservations", fields: [user_id], references: [user_id], onDelete: Cascade)
-  payments      Payment[]
+  user_id        String            @db.Uuid
+  service_id     String?           @db.Uuid
+  business_id    String            @db.Uuid
+  pet_id         String?           @db.Uuid
+  payment_id     String?           @db.Uuid
+  status         ReservationStatus
+  notes          String?
+  created_at     DateTime          @default(now())
+  updated_at     DateTime          @updatedAt
+  price          Decimal           @default(0)
+  start_time     DateTime
+  end_time       DateTime?
+  is_available   Boolean           @default(true)
+  business       User              @relation("BusinessReservations", fields: [business_id], references: [id], onDelete: Cascade)
+  pet            Pet?              @relation(fields: [pet_id], references: [pet_id], onDelete: Cascade)
+  service        Service?          @relation(fields: [service_id], references: [service_id], onDelete: Cascade)
+  user           User              @relation("UserReservations", fields: [user_id], references: [id], onDelete: Cascade)
+  payment        Payment?          @relation(fields: [payment_id], references: [payment_id], onDelete: SetNull)
 
   @@index([business_id, start_time, end_time, is_available])
   @@index([user_id, start_time])
@@ -96,11 +143,45 @@ model Notification {
   title           String
   updated_at      DateTime         @updatedAt
   type            NotificationType
-  user            User             @relation("UserNotifications", fields: [user_id], references: [user_id], onDelete: Cascade)
+  user            User             @relation("UserNotifications", fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id, is_read])
   @@index([created_at])
   @@map("notifications")
+}
+
+model BusinessSchedule {
+  id            String        @id @default(uuid()) @db.Uuid
+  business_id   String        @db.Uuid
+  schedule_data Json?
+  day_of_week   String?
+  type          ScheduleType?
+  start_time    String?
+  end_time      String?
+  reason        String?
+  is_day_off    Boolean?      @default(false)
+  created_at    DateTime      @default(now())
+  updated_at    DateTime      @updatedAt
+  business      User          @relation("BusinessSchedules", fields: [business_id], references: [id], onDelete: Cascade)
+
+  @@index([business_id])
+  @@map("business_schedules")
+}
+
+model BusinessService {
+  id          String   @id @default(uuid()) @db.Uuid
+  business_id String   @db.Uuid
+  service_id  String   @db.Uuid
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  business    User     @relation("BusinessToServices", fields: [business_id], references: [id], onDelete: Cascade)
+  service     Service  @relation("ServiceToBusinesses", fields: [service_id], references: [service_id], onDelete: Cascade)
+
+  @@unique([business_id, service_id])
+  @@index([business_id])
+  @@index([service_id])
+  @@map("business_services")
 }
 
 enum ServiceCategory {
@@ -139,114 +220,49 @@ enum NotificationType {
 }
 
 enum PaymentStatus {
-  READY        // 결제 준비
-  IN_PROGRESS  // 결제 진행중
-  WAITING_FOR_DEPOSIT // 가상계좌 입금 대기
-  PENDING      // 결제 대기
-  DONE         // 결제 완료
-  CANCELED     // 결제 취소
-  ABORTED      // 결제 중단
-  FAILED       // 결제 실패
+  READY
+  IN_PROGRESS
+  WAITING_FOR_DEPOSIT
+  DONE
+  CANCELED
+  ABORTED
+  FAILED
+  PENDING
 }
 
 enum PaymentMethod {
-  CARD         // 카드 결제
-  VIRTUAL_ACCOUNT // 가상계좌
-  ACCOUNT_TRANSFER // 계좌이체
-  MOBILE_PAYMENT   // 휴대폰 결제
-  GIFT_CARD       // 상품권
-  EASY_PAY        // 간편결제
-}
-
-model Payment {
-  payment_id      String        @id @default(uuid()) @db.Uuid
-  service_id      String        @db.Uuid
-  business_id     String        @db.Uuid
-  user_id         String        @db.Uuid
-  reservation_id  String?       @db.Uuid
-  orderId        String        // 주문 번호 (가맹점에서 생성한 주문 번호)
-  paymentKey     String?       // 토스 페이먼츠 결제 키
-  status         PaymentStatus
-  method         PaymentMethod
-  amount         Decimal
-  approved_at    DateTime?     // 결제 승인 시각
-  requested_at   DateTime      @default(now()) // 결제 요청 시각
-  canceled_at    DateTime?     // 결제 취소 시각
-  failed_at      DateTime?     // 결제 실패 시각
-  cancel_reason  String?       // 결제 취소 사유
-  fail_reason    String?       // 결제 실패 사유
-  
-  // 카드 결제 정보
-  card_number    String?       // 마스킹된 카드 번호
-  card_issuer    String?       // 카드 발급사
-  card_acquirer  String?       // 카드 매입사
-  card_installment_plan_months Int?  // 할부 개월 수
-  
-  // 가상계좌 정보
-  virtual_account_number      String?  // 가상계좌 번호
-  virtual_account_bank_code   String?  // 가상계좌 은행 코드
-  virtual_account_due_date    DateTime? // 입금 기한
-  
-  // 영수증 정보
-  receipt_url    String?      // 영수증 URL
-  
-  // 결제 요청 정보
-  success_url   String?       // 성공 URL
-  fail_url      String?       // 실패 URL
-  memo          String?       // 메모
-  
-  // 메타데이터
-  metadata       Json?         // 가맹점에서 전달한 추가 정보
-  
-  // 관계
-  service        Service       @relation(fields: [service_id], references: [service_id], onDelete: Cascade)
-  business       User          @relation("BusinessPayments", fields: [business_id], references: [user_id], onDelete: Cascade)
-  user           User          @relation("UserPayments", fields: [user_id], references: [user_id], onDelete: Cascade)
-  reservation    Reservation?  @relation(fields: [reservation_id], references: [reservation_id], onDelete: Cascade)
-
-  @@index([orderId])
-  @@index([paymentKey])
-  @@index([status])
-  @@index([requested_at])
-  @@map("payments")
+  CARD
+  VIRTUAL_ACCOUNT
+  ACCOUNT_TRANSFER
+  MOBILE_PAYMENT
+  GIFT_CARD
+  EASY_PAY
 }
 
 enum ScheduleType {
-  WEEKLY  // 주간 스케줄
-  BREAK   // 휴식 시간
+  WEEKLY
+  BREAK
 }
 
-model BusinessSchedule {
-  id           String       @id @default(uuid()) @db.Uuid
-  business_id  String       @db.Uuid
-  schedule_data Json?        // 요일별 스케줄 데이터 (JSON 형식)
-  day_of_week  String?      // 기존 방식 호환성 유지 (새 방식에서는 사용 안함)
-  type         ScheduleType? // 기존 방식 호환성 유지 (새 방식에서는 사용 안함)
-  start_time   String?      // 기존 방식 호환성 유지 (새 방식에서는 사용 안함)
-  end_time     String?      // 기존 방식 호환성 유지 (새 방식에서는 사용 안함)
-  reason       String?      // 기존 방식 호환성 유지 (새 방식에서는 사용 안함)
-  is_day_off   Boolean?     @default(false) // 기존 방식 호환성 유지 (새 방식에서는 사용 안함)
-  created_at   DateTime     @default(now())
-  updated_at   DateTime     @updatedAt
-  business     User         @relation("BusinessSchedules", fields: [business_id], references: [user_id], onDelete: Cascade)
+model Payment {
+  payment_id    String         @id @default(uuid()) @db.Uuid
+  user_id       String         @db.Uuid
+  service_id    String?        @db.Uuid
+  business_id   String?        @db.Uuid
+  amount        Decimal
+  status        PaymentStatus
+  method        PaymentMethod
+  orderId       String         @unique
+  paymentKey    String?
+  requested_at  DateTime       @default(now())
+  approved_at   DateTime?
+  canceled_at   DateTime?
+  cancel_reason String?
+  metadata      Json?
+  user          User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  service       Service?       @relation(fields: [service_id], references: [service_id], onDelete: SetNull)
+  business      User?          @relation("BusinessPayments", fields: [business_id], references: [id], onDelete: SetNull)
+  reservations  Reservation[]
 
-  @@index([business_id])
-  @@map("business_schedules")
-}
-
-model BusinessService {
-  id           String   @id @default(uuid()) @db.Uuid
-  business_id  String   @db.Uuid
-  service_id   String   @db.Uuid
-  is_active    Boolean  @default(true)
-
-  business     User     @relation("BusinessToServices", fields: [business_id], references: [user_id], onDelete: Cascade)
-  service      Service  @relation("ServiceToBusinesses", fields: [service_id], references: [service_id], onDelete: Cascade)
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
-
-  @@index([business_id])
-  @@index([service_id])
-  @@unique([business_id, service_id])
-  @@map("business_services")
+  @@map("payments")
 }

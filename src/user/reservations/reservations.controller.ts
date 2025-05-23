@@ -14,7 +14,7 @@ import {
 import { ReservationsService } from './reservations.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
-import { SupabaseAuthGuard } from '@/auth/supabase-auth.guard';
+import { AuthGuard } from '@/auth/auth.guard';
 import { Request } from 'express';
 import {
   ApiTags,
@@ -141,10 +141,10 @@ export class ReservationsController {
   })
   @ApiResponse({ status: 200, description: '반려동물 목록 조회 성공' })
   @ApiBearerAuth()
-  @UseGuards(SupabaseAuthGuard)
+  @UseGuards(AuthGuard)
   @Get('/pets')
   getUserPets(@Req() req: Request) {
-    return this.reservationsService.getUserPets(req.user.user_id);
+    return this.reservationsService.getUserPets(req.user.id);
   }
 
   @ApiOperation({
@@ -155,16 +155,13 @@ export class ReservationsController {
   @ApiBody({ type: CreateReservationDto })
   @ApiResponse({ status: 201, description: '예약 생성 성공' })
   @ApiBearerAuth()
-  @UseGuards(SupabaseAuthGuard)
+  @UseGuards(AuthGuard)
   @Post()
   create(
     @Body() createReservationDto: CreateReservationDto,
     @Req() req: Request,
   ) {
-    return this.reservationsService.create(
-      req.user.user_id,
-      createReservationDto,
-    );
+    return this.reservationsService.create(req.user.id, createReservationDto);
   }
 
   @ApiOperation({
@@ -173,10 +170,10 @@ export class ReservationsController {
   })
   @ApiResponse({ status: 200, description: '예약 목록 조회 성공' })
   @ApiBearerAuth()
-  @UseGuards(SupabaseAuthGuard)
+  @UseGuards(AuthGuard)
   @Get('/my-reservations')
   findAll(@Req() req: Request) {
-    return this.reservationsService.findAll(req.user.user_id);
+    return this.reservationsService.findAll(req.user.id);
   }
 
   @ApiOperation({
@@ -186,13 +183,13 @@ export class ReservationsController {
   @ApiParam({ name: 'reservation_id', description: '예약 ID' })
   @ApiResponse({ status: 200, description: '예약 상세 조회 성공' })
   @ApiBearerAuth()
-  @UseGuards(SupabaseAuthGuard)
+  @UseGuards(AuthGuard)
   @Get('/:reservation_id')
   findOne(
     @Param('reservation_id') reservation_id: string,
     @Req() req: Request,
   ) {
-    return this.reservationsService.findOne(reservation_id, req.user.user_id);
+    return this.reservationsService.findOne(reservation_id, req.user.id);
   }
 
   @ApiOperation({
@@ -204,7 +201,7 @@ export class ReservationsController {
   @ApiBody({ type: UpdateReservationDto })
   @ApiResponse({ status: 200, description: '예약 수정 성공' })
   @ApiBearerAuth()
-  @UseGuards(SupabaseAuthGuard)
+  @UseGuards(AuthGuard)
   @Patch('/:reservation_id')
   update(
     @Param('reservation_id') reservation_id: string,
@@ -213,7 +210,7 @@ export class ReservationsController {
   ) {
     return this.reservationsService.update(
       reservation_id,
-      req.user.user_id,
+      req.user.id,
       updateReservationDto,
     );
   }
@@ -222,9 +219,9 @@ export class ReservationsController {
   @ApiParam({ name: 'reservation_id', description: '예약 ID' })
   @ApiResponse({ status: 200, description: '예약 취소 성공' })
   @ApiBearerAuth()
-  @UseGuards(SupabaseAuthGuard)
+  @UseGuards(AuthGuard)
   @Delete('/:reservation_id')
   cancel(@Param('reservation_id') reservation_id: string, @Req() req: Request) {
-    return this.reservationsService.cancel(reservation_id, req.user.user_id);
+    return this.reservationsService.cancel(reservation_id, req.user.id);
   }
 }

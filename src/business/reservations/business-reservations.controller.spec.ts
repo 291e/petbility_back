@@ -3,9 +3,9 @@ import { BusinessReservationsController } from './business-reservations.controll
 import { BusinessReservationsService } from './business-reservations.service';
 import { ReservationStatus } from '@prisma/client';
 import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto';
-import { ManageAvailableTimeDto } from './dto/manage-available-time.dto';
-import { SupabaseAuthGuard } from '@/auth/supabase-auth.guard';
-import { RolesGuard } from '@/auth/roles.guard';
+import { AuthGuard } from '../../auth/auth.guard';
+import { RolesGuard } from '../../auth/roles.guard';
+import { UpdateServiceStatusDto } from './dto/update-service-status.dto';
 
 describe('BusinessReservationsController', () => {
   let controller: BusinessReservationsController;
@@ -15,9 +15,8 @@ describe('BusinessReservationsController', () => {
     findAll: jest.fn(),
     findOne: jest.fn(),
     updateStatus: jest.fn(),
-    manageAvailableTime: jest.fn(),
-    getAvailableTime: jest.fn(),
-    getAvailableTimeByDate: jest.fn(),
+    getBusinessServices: jest.fn(),
+    updateServiceStatus: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -30,7 +29,7 @@ describe('BusinessReservationsController', () => {
         },
       ],
     })
-      .overrideGuard(SupabaseAuthGuard)
+      .overrideGuard(AuthGuard)
       .useValue({ canActivate: () => true })
       .overrideGuard(RolesGuard)
       .useValue({ canActivate: () => true })
@@ -128,96 +127,71 @@ describe('BusinessReservationsController', () => {
     });
   });
 
-  describe('manageAvailableTime', () => {
-    it('should manage available time slots', async () => {
-      const manageTimeDto: ManageAvailableTimeDto = {
-        weekly_schedule: [
-          {
-            day_of_week: 'MONDAY',
-            start_time: '09:00',
-            end_time: '18:00',
-          },
-        ],
-      };
-
-      const mockResponse = {
-        weekly_schedule: [
-          {
-            id: '1',
-            business_id: 'business-1',
-            service_id: 'service-1',
-            day_of_week: 'MONDAY',
-            start_time: '09:00',
-            end_time: '18:00',
-          },
-        ],
-      };
-
-      mockBusinessReservationsService.manageAvailableTime.mockResolvedValue(
-        mockResponse,
-      );
-
-      const result = await controller.manageAvailableTime(
-        'business-1',
-        'service-1',
-        manageTimeDto,
-      );
-
-      expect(result).toEqual(mockResponse);
-      expect(
-        mockBusinessReservationsService.manageAvailableTime,
-      ).toHaveBeenCalledWith('business-1', 'service-1', manageTimeDto);
-    });
-  });
-
-  describe('getAvailableTime', () => {
-    it('should return available time slots', async () => {
-      const mockAvailableTimes = [
+  describe('getMyServices', () => {
+    it('should return business services', async () => {
+      const mockServices = [
         {
-          id: '1',
-          business_id: 'business-1',
           service_id: 'service-1',
-          day_of_week: 'MONDAY',
-          start_time: '09:00',
-          end_time: '18:00',
+          name: 'Grooming',
+          description: 'Pet grooming service',
+          price: 50000,
+          category: 'grooming',
+          status: 'active',
         },
       ];
 
-      mockBusinessReservationsService.getAvailableTime.mockResolvedValue(
-        mockAvailableTimes,
+      mockBusinessReservationsService.getBusinessServices.mockResolvedValue(
+        mockServices,
       );
 
-      const result = await controller.getAvailableTime(
-        'business-1',
-        'service-1',
-      );
+      const mockRequest = {
+        user: {
+          id: 'user-1',
+        },
+      };
 
-      expect(result).toEqual(mockAvailableTimes);
+      const result = await controller.getMyServices(mockRequest);
+
+      expect(result).toEqual(mockServices);
       expect(
-        mockBusinessReservationsService.getAvailableTime,
-      ).toHaveBeenCalledWith('business-1', 'service-1');
+        mockBusinessReservationsService.getBusinessServices,
+      ).toHaveBeenCalledWith('user-1');
     });
   });
 
-  describe('getAvailableTimeByDate', () => {
-    it('should return available time slots for a specific date', async () => {
-      const mockDate = '2024-04-08';
-      const mockTimeSlots = ['09:00', '10:00', '11:00'];
+  describe('updateServiceStatus', () => {
+    it('should update service status', async () => {
+      const updateDto: UpdateServiceStatusDto = {
+        status: 'active',
+      };
 
-      mockBusinessReservationsService.getAvailableTimeByDate.mockResolvedValue(
-        mockTimeSlots,
+      const mockUpdatedService = {
+        id: '1',
+        business_id: 'business-1',
+        service_id: 'service-1',
+        is_active: true,
+      };
+
+      mockBusinessReservationsService.updateServiceStatus.mockResolvedValue(
+        mockUpdatedService,
       );
 
-      const result = await controller.getAvailableTimeByDate(
-        'business-1',
+      const mockRequest = {
+        user: {
+          id: 'user-1',
+        },
+      };
+
+      const result = await controller.updateServiceStatus(
+        mockRequest,
         'service-1',
-        mockDate,
+        updateDto,
       );
 
-      expect(result).toEqual(mockTimeSlots);
+      expect(result).toEqual(mockUpdatedService);
       expect(
-        mockBusinessReservationsService.getAvailableTimeByDate,
-      ).toHaveBeenCalledWith('business-1', 'service-1', mockDate);
+        mockBusinessReservationsService.updateServiceStatus,
+      ).toHaveBeenCalledWith('user-1', 'service-1', 'active');
     });
   });
 });

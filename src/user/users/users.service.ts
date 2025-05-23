@@ -3,38 +3,47 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  ConflictException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
-import { SupabaseService } from '@/auth/supabase/supabase.service';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UserRole } from './dto/create-user.dto';
+import { CreateUserDto, UserRole } from './dto/create-user.dto';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
-  constructor(
-    private prisma: PrismaService,
-    private supabaseService: SupabaseService,
-  ) {}
+  private readonly logger = new Logger(UsersService.name);
 
-  async signUp(userData: any) {
-    return this.prisma.user.create({
-      data: {
-        user_id: userData.user_id,
-        email: userData.email,
-        name: userData.name,
-        phone: userData.phone || '',
-        profileImage: userData.profileImage || '',
-        address: userData.address || '',
-        role: userData.role,
-      },
-    });
+  constructor(private prisma: PrismaService) {}
+
+  async signUp(userData: CreateUserDto) {
+    try {
+      return await this.prisma.user.create({
+        data: {
+          email: userData.email,
+          name: userData.name,
+          phone: userData.phone,
+          image: userData.image,
+          address: userData.address,
+          role: userData.role,
+          latitude: userData.latitude,
+          longitude: userData.longitude,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          throw new ConflictException('이미 존재하는 이메일입니다.');
+        }
+      }
+      throw error;
+    }
   }
 
-  async getUserById(userId: string) {
+  async findById(id: string) {
     const user = await this.prisma.user.findUnique({
-      where: { user_id: userId },
+      where: { id },
       include: {
         pets: true,
         services: true,
@@ -54,40 +63,29 @@ export class UsersService {
     return user;
   }
 
-  async updateUser(userId: string, updateDto: UpdateUserDto) {
+  async updateUser(id: string, updateUserDto: UpdateUserDto) {
     try {
       const user = await this.prisma.user.findUnique({
-        where: { user_id: userId },
+        where: { id },
       });
 
       if (!user) {
         throw new NotFoundException('사용자를 찾을 수 없습니다.');
       }
 
-      // 이메일 변경 시 중복 체크
-      if (updateDto.email && updateDto.email !== user.email) {
+      if (updateUserDto.email && updateUserDto.email !== user.email) {
         const existingUser = await this.prisma.user.findFirst({
-          where: {
-            email: updateDto.email,
-            user_id: { not: userId },
-          },
+          where: { email: updateUserDto.email },
         });
+
         if (existingUser) {
           throw new BadRequestException('이미 사용 중인 이메일입니다.');
         }
       }
 
       return await this.prisma.user.update({
-        where: { user_id: userId },
-        data: {
-          email: updateDto.email,
-          name: updateDto.name,
-          phone: updateDto.phone,
-          profileImage: updateDto.profile_image,
-          address: updateDto.address,
-          latitude: updateDto.latitude,
-          longitude: updateDto.longitude,
-        },
+        where: { id },
+        data: updateUserDto,
         include: {
           pets: true,
           services: true,
@@ -96,87 +94,62 @@ export class UsersService {
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
-          throw new BadRequestException('이미 사용 중인 이메일입니다.');
+          throw new ConflictException('이미 존재하는 이메일입니다.');
         }
       }
       throw error;
     }
   }
 
-  async deleteUser(userId: string) {
-    try {
-      const user = await this.prisma.user.findUnique({
-        where: { user_id: userId },
-        include: {
-          pets: true,
-          services: true,
-          reservations: true,
-        },
-      });
+  async deleteUser(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+    });
 
-      if (!user) {
-        throw new NotFoundException('사용자를 찾을 수 없습니다.');
-      }
-
-      // 사업자 계정인 경우 삭제 불가
-      if (user.role === UserRole.BUSINESS) {
-        throw new ForbiddenException('사업자 계정은 삭제할 수 없습니다.');
-      }
-
-      // 관련 데이터 삭제
-      await this.prisma.$transaction([
-        this.prisma.reservation.deleteMany({
-          where: { user_id: userId },
-        }),
-        this.prisma.pet.deleteMany({
-          where: { user_id: userId },
-        }),
-        this.prisma.user.delete({
-          where: { user_id: userId },
-        }),
-      ]);
-
-      return { message: '사용자가 성공적으로 삭제되었습니다.' };
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        throw new BadRequestException('사용자 삭제 중 오류가 발생했습니다.');
-      }
-      throw error;
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
     }
+
+    if (user.role === UserRole.BUSINESS) {
+      throw new ForbiddenException('사업자 계정은 삭제할 수 없습니다.');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.reservation.deleteMany({
+        where: { user_id: id },
+      }),
+      this.prisma.pet.deleteMany({
+        where: { user_id: id },
+      }),
+      this.prisma.user.delete({
+        where: { id },
+      }),
+    ]);
+
+    return { message: '사용자가 성공적으로 삭제되었습니다.' };
   }
 
-  async upgradeToBusiness(userId: string) {
-    try {
-      const user = await this.prisma.user.findUnique({
-        where: { user_id: userId },
-      });
+  async upgradeToBusiness(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+    });
 
-      if (!user) {
-        throw new NotFoundException('사용자를 찾을 수 없습니다.');
-      }
-
-      if (user.role === UserRole.BUSINESS) {
-        throw new BadRequestException('이미 사업자 계정입니다.');
-      }
-
-      return await this.prisma.user.update({
-        where: { user_id: userId },
-        data: {
-          role: UserRole.BUSINESS,
-        },
-        include: {
-          pets: true,
-          services: true,
-        },
-      });
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        throw new BadRequestException(
-          '사업자 계정으로 업그레이드 중 오류가 발생했습니다.',
-        );
-      }
-      throw error;
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
     }
+
+    if (user.role === UserRole.BUSINESS) {
+      throw new BadRequestException('이미 사업자 계정입니다.');
+    }
+
+    return await this.prisma.user.update({
+      where: { id },
+      data: { role: UserRole.BUSINESS },
+      include: {
+        pets: true,
+        services: true,
+      },
+    });
   }
 
   async searchUsers(query: string, page = 1, limit = 10) {
@@ -217,5 +190,117 @@ export class UsersService {
       limit,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  async findAll(filter: any = {}) {
+    const users = await this.prisma.user.findMany({
+      where: filter,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        image: true,
+        address: true,
+        role: true,
+        createdAt: true,
+        latitude: true,
+        longitude: true,
+      },
+    });
+
+    return users;
+  }
+
+  async createUser(createUserDto: CreateUserDto) {
+    try {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { email: createUserDto.email },
+      });
+
+      if (existingUser) {
+        throw new ConflictException('이미 존재하는 이메일입니다.');
+      }
+
+      const newUser = await this.prisma.user.create({
+        data: {
+          email: createUserDto.email,
+          name: createUserDto.name,
+          phone: createUserDto.phone || '',
+          image: createUserDto.image || '',
+          address: createUserDto.address || '',
+          role: createUserDto.role,
+        },
+      });
+
+      return newUser;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        throw new BadRequestException('사용자 생성 중 오류가 발생했습니다.');
+      }
+      throw error;
+    }
+  }
+
+  async findByIdWithFilters(id: string, filter: Record<string, any> = {}) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      include: {
+        ...filter,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    return user;
+  }
+
+  async updateProfile(id: string, updateData: any) {
+    try {
+      const updatedUser = await this.prisma.user.update({
+        where: { id },
+        data: {
+          ...updateData,
+        },
+      });
+
+      return updatedUser;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        throw new BadRequestException(
+          '사용자 프로필 업데이트 중 오류가 발생했습니다.',
+        );
+      }
+      throw error;
+    }
+  }
+
+  async upgradeUserToBusiness(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+    });
+
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    if (user.role === UserRole.BUSINESS) {
+      throw new BadRequestException('이미 사업자 계정입니다.');
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id },
+      data: {
+        role: UserRole.BUSINESS,
+      },
+      include: {
+        pets: true,
+        services: true,
+      },
+    });
+
+    return updatedUser;
   }
 }

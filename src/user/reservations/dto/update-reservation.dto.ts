@@ -1,16 +1,8 @@
-// src/reservations/dto/update-reservation.dto.ts
+// src/user/reservations/dto/update-reservation.dto.ts
 // 예약 수정을 위한 DTO 클래스
 // start_time과 end_time 필드를 사용하여 예약 시간을 수정할 수 있습니다.
 
-import {
-  IsUUID,
-  IsDateString,
-  IsString,
-  IsEnum,
-  IsOptional,
-  IsBoolean,
-} from 'class-validator';
-import { ReservationStatus } from '@prisma/client';
+import { IsDateString, IsString, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateReservationDto {

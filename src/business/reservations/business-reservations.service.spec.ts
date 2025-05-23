@@ -8,9 +8,9 @@ import { ReservationStatus, ServiceCategory } from '@prisma/client';
 // 모킹 데이터
 const mockReservations = [
   {
-    reservation_id: '1',
+    reservation_id: '11111111-1111-1111-1111-111111111111',
     user_id: 'user1',
-    business_id: 'business1',
+    business_id: '22222222-2222-2222-2222-222222222222',
     service_id: 'service1',
     pet_id: 'pet1',
     start_time: new Date('2023-01-01T10:00:00Z'),
@@ -23,9 +23,9 @@ const mockReservations = [
     notes: null,
   },
   {
-    reservation_id: '2',
+    reservation_id: '33333333-3333-3333-3333-333333333333',
     user_id: 'user2',
-    business_id: 'business1',
+    business_id: '22222222-2222-2222-2222-222222222222',
     service_id: 'service2',
     pet_id: 'pet2',
     start_time: new Date('2023-01-01T12:00:00Z'),
@@ -103,8 +103,8 @@ describe('BusinessReservationsService', () => {
     it('should return all reservations for a business', async () => {
       const mockReservations = [
         {
-          reservation_id: 'test-id',
-          business_id: 'test-business-id',
+          reservation_id: '11111111-1111-1111-1111-111111111111',
+          business_id: '22222222-2222-2222-2222-222222222222',
           user_id: 'test-user-id',
           status: ReservationStatus.PENDING,
         },
@@ -114,16 +114,18 @@ describe('BusinessReservationsService', () => {
         mockReservations,
       );
 
-      const result = await service.findAll('test-business-id');
+      const result = await service.findAll(
+        '22222222-2222-2222-2222-222222222222',
+      );
       expect(result).toEqual(mockReservations);
       expect(mockPrismaService.reservation.findMany).toHaveBeenCalledWith({
         where: {
-          business_id: 'test-business-id',
+          business_id: '22222222-2222-2222-2222-222222222222',
           is_available: true,
         },
         include: {
           user: {
-            select: { user_id: true, name: true, phone: true, address: true },
+            select: { id: true, name: true, phone: true, address: true },
           },
           pet: true,
           service: true,
@@ -136,8 +138,8 @@ describe('BusinessReservationsService', () => {
   describe('findOne', () => {
     it('should return a reservation if it exists and belongs to the business', async () => {
       const mockReservation = {
-        reservation_id: 'test-id',
-        business_id: 'test-business-id',
+        reservation_id: '11111111-1111-1111-1111-111111111111',
+        business_id: '22222222-2222-2222-2222-222222222222',
         user_id: 'test-user-id',
         status: ReservationStatus.PENDING,
       };
@@ -146,7 +148,10 @@ describe('BusinessReservationsService', () => {
         mockReservation,
       );
 
-      const result = await service.findOne('test-id', 'test-business-id');
+      const result = await service.findOne(
+        '11111111-1111-1111-1111-111111111111',
+        '22222222-2222-2222-2222-222222222222',
+      );
       expect(result).toEqual(mockReservation);
     });
 
@@ -154,14 +159,17 @@ describe('BusinessReservationsService', () => {
       mockPrismaService.reservation.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.findOne('non-existent-id', 'test-business-id'),
+        service.findOne(
+          '11111111-1111-1111-1111-111111111111',
+          '22222222-2222-2222-2222-222222222222',
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ForbiddenException if reservation does not belong to the business', async () => {
       const mockReservation = {
-        reservation_id: 'test-id',
-        business_id: 'other-business-id',
+        reservation_id: '11111111-1111-1111-1111-111111111111',
+        business_id: '33333333-3333-3333-3333-333333333333',
         user_id: 'test-user-id',
         status: ReservationStatus.PENDING,
       };
@@ -171,7 +179,10 @@ describe('BusinessReservationsService', () => {
       );
 
       await expect(
-        service.findOne('test-id', 'test-business-id'),
+        service.findOne(
+          '11111111-1111-1111-1111-111111111111',
+          '22222222-2222-2222-2222-222222222222',
+        ),
       ).rejects.toThrow(ForbiddenException);
     });
   });
@@ -189,13 +200,17 @@ describe('BusinessReservationsService', () => {
       mockNotificationsService.create.mockResolvedValue({});
 
       // 테스트
-      const result = await service.updateStatus('1', 'business1', {
-        status: ReservationStatus.CONFIRMED,
-      });
+      const result = await service.updateStatus(
+        '11111111-1111-1111-1111-111111111111',
+        '22222222-2222-2222-2222-222222222222',
+        {
+          status: ReservationStatus.CONFIRMED,
+        },
+      );
 
       // 검증
       expect(mockPrismaService.reservation.update).toHaveBeenCalledWith({
-        where: { reservation_id: '1' },
+        where: { reservation_id: '11111111-1111-1111-1111-111111111111' },
         data: { status: ReservationStatus.CONFIRMED },
         include: {
           user: true,

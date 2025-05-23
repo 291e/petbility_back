@@ -12,7 +12,7 @@ import {
 import { AdminServicesService } from './admin-services.service';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
-import { SupabaseAuthGuard } from '@/auth/supabase-auth.guard';
+import { AuthGuard } from '@/auth/auth.guard';
 import { RolesGuard } from '@/auth/roles.guard';
 import { Roles } from '@/auth/decorators/roles.decorator';
 import { Public } from '@/auth/public.decorator';
@@ -41,7 +41,7 @@ export class AdminServicesController {
     status: 201,
     description: '서비스가 성공적으로 생성되었습니다.',
   })
-  @UseGuards(SupabaseAuthGuard, RolesGuard)
+  @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Post()
   create(@Body() dto: CreateServiceDto, @Req() req: Request) {
@@ -90,7 +90,7 @@ export class AdminServicesController {
     description: '서비스가 성공적으로 수정되었습니다.',
   })
   @ApiResponse({ status: 404, description: '서비스를 찾을 수 없습니다.' })
-  @UseGuards(SupabaseAuthGuard, RolesGuard)
+  @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateServiceDto) {
@@ -107,7 +107,7 @@ export class AdminServicesController {
     description: '서비스가 성공적으로 삭제되었습니다.',
   })
   @ApiResponse({ status: 404, description: '서비스를 찾을 수 없습니다.' })
-  @UseGuards(SupabaseAuthGuard, RolesGuard)
+  @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Delete(':id')
   remove(@Param('id') id: string) {

@@ -475,25 +475,17 @@ export class ReservationsService {
       include: {
         business: {
           select: {
-            user_id: true,
+            id: true,
             email: true,
             name: true,
-            profileImage: true,
+            image: true,
             address: true,
             phone: true,
             latitude: true,
             longitude: true,
           },
         },
-        service: {
-          select: {
-            service_id: true,
-            name: true,
-            price: true,
-            description: true,
-            category: true,
-          },
-        },
+        service: true,
       },
     });
 
@@ -835,7 +827,7 @@ export class ReservationsService {
           category: true,
           admin: {
             select: {
-              user_id: true,
+              id: true,
               name: true,
             },
           },

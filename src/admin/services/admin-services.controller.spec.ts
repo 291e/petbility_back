@@ -4,8 +4,7 @@ import { AdminServicesService } from './admin-services.service';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
 import { ServiceCategory } from '@prisma/client';
-import { SupabaseAuthGuard } from '@/auth/supabase-auth.guard';
-import { RolesGuard } from '@/auth/roles.guard';
+import { AuthGuard } from '@/auth/auth.guard';
 import { ExecutionContext } from '@nestjs/common';
 import { Request } from 'express';
 
@@ -48,17 +47,13 @@ describe('AdminServicesController', () => {
         },
       ],
     })
-      .overrideGuard(SupabaseAuthGuard)
+      .overrideGuard(AuthGuard)
       .useValue({
         canActivate: (context: ExecutionContext) => {
           const request = context.switchToHttp().getRequest();
           request.user = mockUser;
           return true;
         },
-      })
-      .overrideGuard(RolesGuard)
-      .useValue({
-        canActivate: () => true,
       })
       .compile();
 

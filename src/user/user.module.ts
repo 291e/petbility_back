@@ -1,4 +1,3 @@
-import { SupabaseModule } from '@/auth/supabase/supabase.module';
 import { Module } from '@nestjs/common';
 import { PrismaModule } from 'prisma/prisma.module';
 import { UsersController } from './users/users.controller';
@@ -8,20 +7,21 @@ import { PetsService } from './pets/pets.service';
 import { ReservationsController } from './reservations/reservations.controller';
 import { ReservationsService } from './reservations/reservations.service';
 import { NotificationsModule } from '@/notifications/notifications.module';
-import { SupabaseService } from '@/auth/supabase/supabase.service';
 import { HttpModule } from '@nestjs/axios';
 import { PaymentsModule } from './payments/payments.module';
+import { AuthGuard } from '@/auth/auth.guard';
+import { AuthModule } from '@/auth/auth.module';
 
 @Module({
   imports: [
     PrismaModule,
-    SupabaseModule,
     NotificationsModule,
     HttpModule,
     PaymentsModule,
+    AuthModule,
   ],
   controllers: [UsersController, PetsController, ReservationsController],
-  providers: [UsersService, PetsService, ReservationsService, SupabaseService],
+  providers: [UsersService, PetsService, ReservationsService, AuthGuard],
   exports: [UsersService],
 })
 export class UserModule {}

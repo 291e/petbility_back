@@ -1,4 +1,4 @@
-// src/reservations/dto/create-reservation.dto.ts
+// src/user/reservations/dto/create-reservation.dto.ts
 // 예약 생성을 위한 DTO 클래스
 // start_time과 end_time 필드를 사용하여 예약 시간을 지정합니다.
 

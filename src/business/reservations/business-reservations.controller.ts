@@ -15,9 +15,9 @@ import {
 } from '@nestjs/common';
 import { BusinessReservationsService } from './business-reservations.service';
 import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto';
-import { RolesGuard } from '@/auth/roles.guard';
-import { Roles } from '@/auth/decorators/roles.decorator';
-import { SupabaseAuthGuard } from '@/auth/supabase-auth.guard';
+import { RolesGuard } from '../../auth/roles.guard';
+import { Roles } from '../../auth/decorators/roles.decorator';
+import { AuthGuard } from '../../auth/auth.guard';
 import {
   ApiTags,
   ApiOperation,
@@ -29,7 +29,7 @@ import { UpdateServiceStatusDto } from './dto/update-service-status.dto';
 
 @ApiTags('비즈니스 예약 및 서비스 관리')
 @Controller('business/reservations')
-@UseGuards(SupabaseAuthGuard, RolesGuard)
+@UseGuards(AuthGuard, RolesGuard)
 @Roles('BUSINESS')
 export class BusinessReservationsController {
   private readonly logger = new Logger(BusinessReservationsController.name);
@@ -167,7 +167,7 @@ export class BusinessReservationsController {
   })
   @Get('/my-services')
   async getMyServices(@Request() req) {
-    const user_id = req.user.user_id;
+    const user_id = req.user.id;
 
     return this.businessReservationsService.getBusinessServices(user_id);
   }
@@ -217,7 +217,7 @@ export class BusinessReservationsController {
     @Body() updateServiceStatusDto: UpdateServiceStatusDto,
   ) {
     this.logger.debug(`Request user: ${JSON.stringify(req.user)}`);
-    const user_id = req.user.user_id;
+    const user_id = req.user.id;
     this.logger.debug(`Using user_id: ${user_id} for updateServiceStatus`);
     return this.businessReservationsService.updateServiceStatus(
       user_id,

@@ -5,6 +5,9 @@ import {
   IsOptional,
   IsString,
   ValidateNested,
+  ArrayMinSize,
+  ArrayMaxSize,
+  Matches,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -16,6 +19,9 @@ export class BreakTimeDto {
   })
   @IsString()
   @IsNotEmpty()
+  @Matches(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: '시간 형식이 올바르지 않습니다. HH:MM 형식으로 입력해주세요.',
+  })
   start: string;
 
   @ApiProperty({
@@ -24,6 +30,9 @@ export class BreakTimeDto {
   })
   @IsString()
   @IsNotEmpty()
+  @Matches(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: '시간 형식이 올바르지 않습니다. HH:MM 형식으로 입력해주세요.',
+  })
   end: string;
 }
 
@@ -35,6 +44,8 @@ export class ScheduleDto {
   })
   @IsArray()
   @IsBoolean({ each: true })
+  @ArrayMinSize(7)
+  @ArrayMaxSize(7)
   selectedDays: boolean[];
 
   @ApiProperty({
@@ -43,6 +54,9 @@ export class ScheduleDto {
   })
   @IsString()
   @IsNotEmpty()
+  @Matches(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: '시간 형식이 올바르지 않습니다. HH:MM 형식으로 입력해주세요.',
+  })
   startTime: string;
 
   @ApiProperty({
@@ -51,6 +65,9 @@ export class ScheduleDto {
   })
   @IsString()
   @IsNotEmpty()
+  @Matches(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: '시간 형식이 올바르지 않습니다. HH:MM 형식으로 입력해주세요.',
+  })
   endTime: string;
 
   @ApiProperty({

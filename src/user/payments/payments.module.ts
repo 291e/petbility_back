@@ -6,7 +6,7 @@ import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
 import { NotificationsModule } from '@/notifications/notifications.module';
 import { TossPaymentsModule } from '@/toss-payments/toss-payments.module';
-import { SupabaseModule } from '@/auth/supabase/supabase.module';
+import { AuthModule } from '@/auth/auth.module';
 
 @Module({
   imports: [
@@ -14,7 +14,7 @@ import { SupabaseModule } from '@/auth/supabase/supabase.module';
     ConfigModule,
     NotificationsModule,
     TossPaymentsModule,
-    SupabaseModule,
+    AuthModule,
   ],
   controllers: [PaymentsController],
   providers: [PaymentsService, PrismaService],

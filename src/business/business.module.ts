@@ -4,10 +4,11 @@ import { BusinessReservationsController } from './reservations/business-reservat
 import { BusinessReservationsService } from './reservations/business-reservations.service';
 // import { BusinessStatisticsController } from './statistics/business-statistics.controller';
 // import { BusinessStatisticsService } from './statistics/business-statistics.service';
-import { SupabaseModule } from '@/auth/supabase/supabase.module';
 import { NotificationsModule } from '@/notifications/notifications.module';
 import { BusinessScheduleController } from './schedule/business-schedule.controller';
 import { BusinessScheduleService } from './schedule/business-schedule.service';
+import { AuthModule } from '@/auth/auth.module';
+import { AuthGuard } from '@/auth/auth.guard';
 
 /**
  * 주의: 현재 예약 관련 기능이 다음과 같이 중복되어 있습니다:
@@ -19,14 +20,15 @@ import { BusinessScheduleService } from './schedule/business-schedule.service';
  * - BusinessSchedule: 영업 시간/스케줄 관리만 담당
  */
 @Module({
-  imports: [PrismaModule, SupabaseModule, NotificationsModule],
+  imports: [PrismaModule, AuthModule, NotificationsModule],
   controllers: [
     BusinessReservationsController,
     BusinessScheduleController, // 스케줄 컨트롤러 등록
   ],
   providers: [
     BusinessReservationsService,
-    BusinessScheduleService, // 스케줄 서비스 등록
+    BusinessScheduleService,
+    AuthGuard, // 스케줄 서비스 등록
   ],
 })
 export class BusinessModule {}

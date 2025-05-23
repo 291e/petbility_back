@@ -34,7 +34,7 @@ export class AdminUsersService {
 
   async findUserById(userId: string) {
     const user = await this.prisma.user.findUnique({
-      where: { user_id: userId },
+      where: { id: userId },
       include: {
         reservations: {
           include: {
@@ -53,7 +53,7 @@ export class AdminUsersService {
   // ✅ 유저 삭제 (소프트 또는 하드 삭제)
   async deleteUser(userId: string) {
     const user = await this.prisma.user.findUnique({
-      where: { user_id: userId },
+      where: { id: userId },
       include: {
         services: true,
         reservations: true,
@@ -63,19 +63,19 @@ export class AdminUsersService {
     if (!user) throw new NotFoundException('해당 유저가 존재하지 않습니다.');
 
     // 👉 하드 삭제 (원하면 soft delete로 수정 가능)
-    return this.prisma.user.delete({ where: { user_id: userId } });
+    return this.prisma.user.delete({ where: { id: userId } });
   }
 
   // ✅ 유저 역할 변경
   async updateUserRole(userId: string, role: string) {
     const user = await this.prisma.user.findUnique({
-      where: { user_id: userId },
+      where: { id: userId },
     });
 
     if (!user) throw new NotFoundException('유저를 찾을 수 없습니다.');
 
     return this.prisma.user.update({
-      where: { user_id: userId },
+      where: { id: userId },
       data: { role },
     });
   }
